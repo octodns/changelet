@@ -176,13 +176,12 @@ class _ChangeMeta:
             return None, datetime(year=1970, month=1, day=1)
 
 
-def _get_changelogs():
+def _get_changelogs(directory):
     ret = []
-    dirname = '.changelog'
-    for filename in listdir(dirname):
+    for filename in listdir(directory):
         if not filename.endswith('.md'):
             continue
-        filepath = join(dirname, filename)
+        filepath = join(directory, filename)
         with open(filepath) as fh:
             pieces = fh.read().split('---\n')
             data = safe_load(pieces[1])
@@ -231,12 +230,13 @@ def _format_version(version):
 
 class Bump:
 
-    def parse(self, argv):
+    def parse(self, argv, exit_on_error=True):
         prog = basename(argv.pop(0))
         parser = ArgumentParser(
             prog=f'{prog} bump',
             description='Builds a changelog update and calculates a new version number.',
             add_help=True,
+            exit_on_error=exit_on_error,
         )
 
         parser.add_argument(
@@ -250,7 +250,9 @@ class Bump:
 
         return parser.parse_args(argv)
 
-    def run(self, args):
+    def run(self, args, directory='.'):
+        directory = join(directory, '.changelog')
+
         buf = StringIO()
 
         cwd = getcwd()
@@ -258,11 +260,12 @@ class Bump:
 
         buf.write('## ')
         current_version = _get_current_version(module_name)
-        changelogs = _get_changelogs()
+        changelogs = _get_changelogs(directory)
         new_version = _get_new_version(current_version, changelogs)
         if not new_version:
             print('No changelog entries found that would bump, nothing to do')
             exit(1)
+            return
         new_version = _format_version(new_version)
         buf.write(new_version)
         buf.write(' - ')
@@ -304,24 +307,27 @@ class Bump:
 
         buf.write('\n')
 
+        buf = buf.getvalue()
         if not args.make_changes:
             print(f'New version number {new_version}\n')
-            print(buf.getvalue())
+            print(buf)
             exit(0)
+        else:
+            with open('CHANGELOG.md') as fh:
+                existing = fh.read()
 
-        with open('CHANGELOG.md') as fh:
-            existing = fh.read()
+            with open('CHANGELOG.md', 'w') as fh:
+                fh.write(buf)
+                fh.write(existing)
 
-        with open('CHANGELOG.md', 'w') as fh:
-            fh.write(buf.getvalue())
-            fh.write(existing)
+            with open(f'{module_name}/__init__.py') as fh:
+                existing = fh.read()
 
-        with open(f'{module_name}/__init__.py') as fh:
-            existing = fh.read()
+            current_version = _format_version(current_version)
+            with open(f'{module_name}/__init__.py', 'w') as fh:
+                fh.write(existing.replace(current_version, new_version))
 
-        current_version = _format_version(current_version)
-        with open(f'{module_name}/__init__.py', 'w') as fh:
-            fh.write(existing.replace(current_version, new_version))
+            for changelog in changelogs:
+                remove(changelog['filepath'])
 
-        for changelog in changelogs:
-            remove(changelog['filepath'])
+        return new_version, buf

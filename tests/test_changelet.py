@@ -4,13 +4,14 @@
 
 from argparse import ArgumentError
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta
 from io import StringIO
 from shutil import rmtree
 from tempfile import mkdtemp
 from unittest import TestCase
 from unittest.mock import patch
 
-from changelet.base import Check, Create
+from changelet.base import Bump, Check, Create
 
 
 class TemporaryDirectory(object):
@@ -283,4 +284,91 @@ class TestCheck(TestCase):
         args = run_mock.call_args[0][0]
         self.assertEqual(
             ['git', 'diff', '--name-only', 'origin/main', './.changelog'], args
+        )
+
+
+class TestBump(TestCase):
+
+    class MockArgs:
+        def __init__(self, title, make_changes=False):
+            self.title = title
+            self.make_changes = make_changes
+
+    def test_parse_none(self):
+        cmd = Bump()
+
+        argv = ['e*e']
+        with self.assertRaises(ArgumentError) as ctx:
+            cmd.parse(argv, exit_on_error=False)
+        msg = ctx.exception.message
+        self.assertEqual('the following arguments are required: title', msg)
+
+    def test_parse_title(self):
+        cmd = Bump()
+
+        desc = ['The release as one string']
+        argv = ['e*e', *desc]
+        args = cmd.parse(argv, exit_on_error=False)
+        self.assertEqual(desc, args.title)
+        self.assertFalse(args.make_changes)
+
+        desc = 'The release as individual words'.split(' ')
+        argv = ['e*e', *desc]
+        args = cmd.parse(argv, exit_on_error=False)
+        self.assertEqual(desc, args.title)
+
+    def test_parse_make_changes(self):
+        cmd = Bump()
+
+        desc = ['The release as one string']
+        argv = ['e*e', '--make-changes', *desc]
+        args = cmd.parse(argv, exit_on_error=False)
+        self.assertEqual(desc, args.title)
+        self.assertTrue(args.make_changes)
+
+        desc = 'The release as individual words'.split(' ')
+        argv = ['e*e', '--make-changes', *desc]
+        args = cmd.parse(argv, exit_on_error=False)
+        self.assertEqual(desc, args.title)
+        self.assertTrue(args.make_changes)
+
+    @patch('changelet.base.exit')
+    @patch('changelet.base._get_changelogs')
+    @patch('changelet.base._get_current_version')
+    def test_run(self, gcv_mock, gcl_mock, exit_mock):
+        cmd = Bump()
+
+        gcv_mock.return_value = (0, 1, 3)
+        now = datetime.now()
+        gcl_mock.return_value = [
+            {
+                'filepath': '',
+                'md': 'change 1',
+                'pr': 42,
+                'time': now - timedelta(days=1),
+                'type': 'major',
+            },
+            {
+                'filepath': '',
+                'md': 'change 2',
+                'pr': 88,
+                'time': now - timedelta(days=2),
+                'type': 'minor',
+            },
+        ]
+
+        title = 'This is the title'.split(' ')
+        new_version, buf = cmd.run(self.MockArgs(title))
+        self.assertEqual('1.0.0', new_version)
+        self.assertEqual(
+            '''## 1.0.0 - 2025-07-13 - This is the title
+
+Major:
+* change 1 [#42](https://github.com/octodns/changelet/pull/42)
+
+Minor:
+* change 2 [#88](https://github.com/octodns/changelet/pull/88)
+
+''',
+            buf,
         )
