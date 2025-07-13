@@ -30,9 +30,7 @@ tests_require = (
 setup(
     author='Ross McFarland',
     author_email='rwmcfa1@gmail.com',
-    entry_points={
-        'console_scripts': ('changelet = changelet.cmds.changelet:main',)
-    },
+    entry_points={'console_scripts': ('changelet = changelet.cmds:main',)},
     description=description,
     extras_require={
         'dev': tests_require
@@ -50,6 +48,7 @@ setup(
         ),
         'test': tests_require,
     },
+    install_requires=('PyYaml',),
     license='MIT',
     long_description=long_description,
     long_description_content_type='text/markdown',
