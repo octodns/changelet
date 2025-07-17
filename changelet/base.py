@@ -126,9 +126,8 @@ class Check:
         return False
 
 
-def _get_current_version(module_name):
-    cwd = getcwd()
-    path.append(cwd)
+def _get_current_version(module_name, directory='.'):
+    path.append(directory)
     module = import_module(module_name)
     # TODO: make sure this requires 3-part semantic version
     return tuple(int(v) for v in module.__version__.split('.', 2))
@@ -179,7 +178,7 @@ class _ChangeMeta:
 
 def _get_changelogs(directory):
     ret = []
-    for filename in listdir(directory):
+    for filename in sorted(listdir(directory)):
         if not filename.endswith('.md'):
             continue
         filepath = join(directory, filename)
@@ -190,7 +189,7 @@ def _get_changelogs(directory):
             if md[-1] == '\n':
                 md = md[:-1]
         pr, time = _ChangeMeta.get(filepath, data)
-        if not pr:
+        if pr is None:
             continue
         ret.append(
             {

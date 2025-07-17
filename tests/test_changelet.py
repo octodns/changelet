@@ -6,6 +6,7 @@ from argparse import ArgumentError
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 from io import StringIO
+from json import dumps
 from os import makedirs
 from os.path import join
 from shutil import rmtree
@@ -17,7 +18,10 @@ from changelet.base import (
     Bump,
     Check,
     Create,
+    _ChangeMeta,
     _format_version,
+    _get_changelogs,
+    _get_current_version,
     _get_new_version,
 )
 
@@ -535,4 +539,116 @@ class TestGetNewVersion(TestCase):
         self.assertEqual(
             (1, 3, 0),
             _get_new_version((1, 2, 3), [{'type': 'minor'}, {'type': 'major'}]),
+        )
+
+
+class TestGetChangelog(TestCase):
+
+    @patch('changelet.base._ChangeMeta.get')
+    def test_load(self, cm_mock):
+        with TemporaryDirectory() as td:
+            directory = join(td.dirname, '.changelog')
+            makedirs(directory)
+
+            # add a junk file that will be ignored
+            with open(join(directory, 'foo.txt'), 'w') as fh:
+                fh.write('ignored')
+
+            return_values = []
+            now = datetime(2025, 7, 1)
+
+            def write_cl(i, _type, pr, append=None):
+                return_values.append([pr, now - timedelta(days=i)])
+                filename = join(td.dirname, '.changelog', f'cl_{i:04}.md')
+                with open(filename, 'w') as fh:
+                    fh.write(
+                        f'''---
+type: {_type}
+---
+This is change {i}, It is a {_type}'''
+                    )
+                    if append:
+                        fh.write(append)
+
+            for i, _type in enumerate(
+                ('none', 'minor', 'major', 'major', 'patch')
+            ):
+                write_cl(i, _type, i, '\n' if i % 2 == 0 else None)
+            # one that will be ignored b/c it has no PR
+            write_cl(i + 1, 'patch', None)
+
+            cm_mock.side_effect = return_values
+
+            changelogs = _get_changelogs(directory=directory)
+            # make sure they're in the order we expect, descending type & date
+            self.assertEqual([2, 3, 1, 4, 0], [c['pr'] for c in changelogs])
+
+
+class TestGetCurrentVersion(TestCase):
+
+    def test_get_current_version(self):
+        with TemporaryDirectory() as td:
+            module_name = 'foo_bar'
+            with open(join(td.dirname, f'{module_name}.py'), 'w') as fh:
+                fh.write('__version__ = "3.2.1"')
+
+            ver = _get_current_version(module_name, directory=td.dirname)
+            self.assertEqual((3, 2, 1), ver)
+
+
+class TestChangeMeta(TestCase):
+
+    class MockResult:
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    @patch('changelet.base.run')
+    def test_fill_cache(self, run_mock):
+
+        run_mock.return_value = self.MockResult(
+            dumps(
+                [
+                    # straightforward
+                    {
+                        'number': 42,
+                        'files': [{'path': '.changelog/foo.md'}],
+                        'mergedAt': '2025-07-01T10:42Z',
+                    },
+                    # no changelog
+                    {
+                        'number': 43,
+                        'files': [{'path': 'other.txt'}],
+                        'mergedAt': '2025-07-02T10:42Z',
+                    },
+                    # multiple changelog
+                    {
+                        'number': 44,
+                        'files': [
+                            {'path': '.changelog/bar.md'},
+                            {'path': '.changelog/baz.md'},
+                        ],
+                        'mergedAt': '2025-07-03T10:42Z',
+                    },
+                ]
+            )
+        )
+
+        self.assertIsNone(_ChangeMeta._pr_cache)
+        # for now we're focused on the cache processing so we just need to call get
+        _ChangeMeta.get('', {})
+        self.assertEqual(
+            {
+                '.changelog/foo.md': (42, datetime(2025, 7, 1, 10, 42)),
+                '.changelog/bar.md': (44, datetime(2025, 7, 3, 10, 42)),
+                '.changelog/baz.md': (44, datetime(2025, 7, 3, 10, 42)),
+            },
+            _ChangeMeta._pr_cache,
+        )
+        # get something out of our cache
+        self.assertEqual(44, _ChangeMeta.get('.changelog/bar.md', {})[0])
+        self.assertIsNone(_ChangeMeta.get('.changelog/nope.md', {})[0])
+
+        # something with an explicit/override PR
+        self.assertEqual(
+            45, _ChangeMeta.get('.changelog/nope.md', {'pr': 45})[0]
         )
