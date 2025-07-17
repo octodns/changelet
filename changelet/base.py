@@ -130,6 +130,7 @@ def _get_current_version(module_name):
     cwd = getcwd()
     path.append(cwd)
     module = import_module(module_name)
+    # TODO: make sure this requires 3-part semantic version
     return tuple(int(v) for v in module.__version__.split('.', 2))
 
 
@@ -219,8 +220,10 @@ def _get_new_version(current_version, changelogs):
     elif bump_type == 'minor':
         new_version[1] += 1
         new_version[2] = 0
-    else:
+    elif bump_type == 'patch':
         new_version[2] += 1
+    else:
+        return None
     return tuple(new_version)
 
 
@@ -251,8 +254,6 @@ class Bump:
         return parser.parse_args(argv)
 
     def run(self, args, directory='.'):
-        directory = join(directory, '.changelog')
-
         buf = StringIO()
 
         cwd = getcwd()
@@ -260,7 +261,7 @@ class Bump:
 
         buf.write('## ')
         current_version = _get_current_version(module_name)
-        changelogs = _get_changelogs(directory)
+        changelogs = _get_changelogs(join(directory, '.changelog'))
         new_version = _get_new_version(current_version, changelogs)
         if not new_version:
             print('No changelog entries found that would bump, nothing to do')
@@ -313,21 +314,25 @@ class Bump:
             print(buf)
             exit(0)
         else:
-            with open('CHANGELOG.md') as fh:
+            changelog = join(directory, 'CHANGELOG.md')
+            print(f'changelog={changelog}')
+            with open(changelog) as fh:
                 existing = fh.read()
 
-            with open('CHANGELOG.md', 'w') as fh:
+            with open(changelog, 'w') as fh:
                 fh.write(buf)
                 fh.write(existing)
 
-            with open(f'{module_name}/__init__.py') as fh:
+            init = join(directory, module_name, '__init__.py')
+            with open(init) as fh:
                 existing = fh.read()
 
             current_version = _format_version(current_version)
-            with open(f'{module_name}/__init__.py', 'w') as fh:
+            with open(init, 'w') as fh:
                 fh.write(existing.replace(current_version, new_version))
 
             for changelog in changelogs:
-                remove(changelog['filepath'])
+                filepath = join(directory, changelog['filepath'])
+                remove(filepath)
 
         return new_version, buf

@@ -6,12 +6,20 @@ from argparse import ArgumentError
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 from io import StringIO
+from os import makedirs
+from os.path import join
 from shutil import rmtree
 from tempfile import mkdtemp
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import call, patch
 
-from changelet.base import Bump, Check, Create
+from changelet.base import (
+    Bump,
+    Check,
+    Create,
+    _format_version,
+    _get_new_version,
+)
 
 
 class TemporaryDirectory(object):
@@ -335,10 +343,17 @@ class TestBump(TestCase):
     @patch('changelet.base.exit')
     @patch('changelet.base._get_changelogs')
     @patch('changelet.base._get_current_version')
-    def test_run(self, gcv_mock, gcl_mock, exit_mock):
+    def test_run_nothing(self, gcv_mock, gcl_mock, exit_mock):
         cmd = Bump()
 
         gcv_mock.return_value = (0, 1, 3)
+        title = 'This is the title'.split(' ')
+
+        # no changes
+        gcl_mock.return_value = []
+        self.assertIsNone(cmd.run(self.MockArgs(title)))
+
+        # only type none
         now = datetime.now()
         gcl_mock.return_value = [
             {
@@ -346,29 +361,178 @@ class TestBump(TestCase):
                 'md': 'change 1',
                 'pr': 42,
                 'time': now - timedelta(days=1),
-                'type': 'major',
+                'type': 'none',
             },
             {
                 'filepath': '',
                 'md': 'change 2',
                 'pr': 88,
                 'time': now - timedelta(days=2),
+                'type': 'none',
+            },
+        ]
+        self.assertIsNone(cmd.run(self.MockArgs(title)))
+
+    @patch('changelet.base.exit')
+    @patch('changelet.base._get_changelogs')
+    @patch('changelet.base._get_current_version')
+    @patch('changelet.base.remove')
+    def test_run_dry_run(self, rm_mock, gcv_mock, gcl_mock, exit_mock):
+        cmd = Bump()
+
+        gcv_mock.return_value = (0, 1, 3)
+        now = datetime.now()
+        gcl_mock.return_value = [
+            # major
+            {
+                'filepath': 'one',
+                'md': 'change 1',
+                'pr': 42,
+                'time': now - timedelta(days=1),
+                'type': 'major',
+            },
+            # minor
+            {
+                'filepath': 'two.one',
+                'md': 'change 2.1',
+                'pr': 88,
+                'time': now - timedelta(days=2),
                 'type': 'minor',
+            },
+            {
+                'filepath': 'two.two',
+                'md': 'change 2.2',
+                'pr': 89,
+                'time': now - timedelta(days=2),
+                'type': 'minor',
+            },
+            ## no PR, no link
+            {
+                'filepath': 'two.three',
+                'md': 'change 2.3',
+                'pr': None,
+                'time': now - timedelta(days=2),
+                'type': 'minor',
+            },
+            ## no MD, skipped
+            {
+                'filepath': 'two.four',
+                'md': None,
+                'pr': -1,
+                'time': now - timedelta(days=2),
+                'type': 'minor',
+            },
+            # patch
+            {
+                'filepath': 'three',
+                'md': 'change 3',
+                'pr': 99,
+                'time': now - timedelta(days=3),
+                'type': 'patch',
+            },
+            # none, not included
+            {
+                'filepath': 'four',
+                'md': 'change 4',
+                'pr': 42,
+                'time': now - timedelta(days=4),
+                'type': 'none',
             },
         ]
 
         title = 'This is the title'.split(' ')
         new_version, buf = cmd.run(self.MockArgs(title))
         self.assertEqual('1.0.0', new_version)
-        self.assertEqual(
-            '''## 1.0.0 - 2025-07-13 - This is the title
+        expected = f'''## 1.0.0 - {now.strftime("%Y-%m-%d")} - This is the title
 
 Major:
 * change 1 [#42](https://github.com/octodns/changelet/pull/42)
 
 Minor:
-* change 2 [#88](https://github.com/octodns/changelet/pull/88)
+* change 2.1 [#88](https://github.com/octodns/changelet/pull/88)
+* change 2.2 [#89](https://github.com/octodns/changelet/pull/89)
+* change 2.3
 
-''',
-            buf,
+Patch:
+* change 3 [#99](https://github.com/octodns/changelet/pull/99)
+
+'''
+        self.assertEqual(expected, buf)
+        rm_mock.assert_not_called()
+
+        # make changes
+        with TemporaryDirectory() as td:
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            with open(changelog, 'w') as fh:
+                fh.write('fin')
+
+            init = join(td.dirname, 'changelet')
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            new_version, buf = cmd.run(
+                self.MockArgs(title, make_changes=True), directory=td.dirname
+            )
+            self.assertEqual('1.0.0', new_version)
+            self.assertEqual(expected, buf)
+            # all the changelog md files were removed
+            rm_mock.assert_has_calls(
+                [
+                    call(f'{td.dirname}/one'),
+                    call(f'{td.dirname}/two.one'),
+                    call(f'{td.dirname}/two.two'),
+                    call(f'{td.dirname}/two.three'),
+                    call(f'{td.dirname}/two.four'),
+                    call(f'{td.dirname}/three'),
+                    call(f'{td.dirname}/four'),
+                ]
+            )
+            # no extra calls
+            self.assertEqual(7, rm_mock.call_count)
+            # changelog md was prepended
+            with open(changelog) as fh:
+                self.assertEqual(f'{expected}fin', fh.read())
+            # init had version updated
+            with open(init) as fh:
+                self.assertEqual("# __version__ = '1.0.0' #", fh.read())
+
+
+class TestFormatVersion(TestCase):
+
+    def test_format(self):
+        self.assertEqual('1.2.3', _format_version((1, 2, 3)))
+        self.assertEqual('1.2.3', _format_version(('1', '2', '3')))
+
+
+class TestGetNewVersion(TestCase):
+
+    def test_get_new_version(self):
+        # no changelogs, get nothing back/no bump
+        self.assertIsNone(_get_new_version((1, 2, 3), []))
+
+        # none doesn't bump
+        self.assertIsNone(_get_new_version((1, 2, 3), [{'type': 'none'}]))
+
+        # patch bump
+        self.assertEqual(
+            (1, 2, 4), _get_new_version((1, 2, 3), [{'type': 'patch'}])
+        )
+
+        # minor bump
+        self.assertEqual(
+            (1, 3, 0), _get_new_version((1, 2, 3), [{'type': 'minor'}])
+        )
+
+        # major bump
+        self.assertEqual(
+            (2, 0, 0), _get_new_version((1, 2, 3), [{'type': 'major'}])
+        )
+
+        # assume the first one is the driving type, ecpect ordered changlogs
+        # entries, don't touch them ourselves
+        self.assertEqual(
+            (1, 3, 0),
+            _get_new_version((1, 2, 3), [{'type': 'minor'}, {'type': 'major'}]),
         )
