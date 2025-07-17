@@ -24,6 +24,9 @@ from changelet.base import (
     _get_current_version,
     _get_new_version,
 )
+from changelet.cmds import general_usage
+from changelet.cmds import main as cmds_main
+from changelet.cmds import register_cmd
 
 
 class TemporaryDirectory(object):
@@ -652,3 +655,71 @@ class TestChangeMeta(TestCase):
         self.assertEqual(
             45, _ChangeMeta.get('.changelog/nope.md', {'pr': 45})[0]
         )
+
+
+class TestCmds(TestCase):
+
+    @patch('changelet.cmds.print')
+    def test_general_usage(self, print_mock):
+        general_usage(('e*e',))
+        self.assertEqual(2, print_mock.call_count)
+        self.assertTrue('Creates and checks' in print_mock.call_args.args[0])
+
+        # with a msg just get the message
+
+        print_mock.reset_mock()
+        msg = 'foo=bar'
+        general_usage(('e*e',), msg)
+        self.assertEqual(2, print_mock.call_count)
+        self.assertEqual(msg, print_mock.call_args.args[0])
+
+    @patch('changelet.cmds.print')
+    @patch('changelet.cmds.exit')
+    def test_main(self, exit_mock, print_mock):
+
+        class Foo:
+            argv = None
+
+            def parse(self, argv):
+                Foo.argv = argv
+                return [42]
+
+            def run(self, args):
+                args.append(43)
+                return args
+
+        register_cmd('foo', Foo)
+
+        # missing command
+        exit_mock.reset_mock()
+        print_mock.reset_mock()
+        cmds_main(['e*e'])
+        exit_mock.assert_called_once()
+        code = exit_mock.call_args[0][0]
+        self.assertEqual(1, code)
+        self.assertEqual('missing command', print_mock.call_args.args[0])
+
+        # unknown command
+        exit_mock.reset_mock()
+        print_mock.reset_mock()
+        cmds_main(['e*e', 'blip'])
+        exit_mock.assert_called_once()
+        code = exit_mock.call_args[0][0]
+        self.assertEqual(1, code)
+        self.assertEqual('unknown command "blip"', print_mock.call_args.args[0])
+
+        # help
+        exit_mock.reset_mock()
+        print_mock.reset_mock()
+        cmds_main(['e*e', '-h'])
+        exit_mock.assert_called_once()
+        code = exit_mock.call_args[0][0]
+        self.assertEqual(0, code)
+        self.assertTrue('Creates and checks' in print_mock.call_args.args[0])
+
+        # valid
+        exit_mock.reset_mock()
+        print_mock.reset_mock()
+        cmds_main(['e*e', 'foo', '--abc', '123'])
+        exit_mock.assert_not_called()
+        self.assertEqual(['e*e', '--abc', '123'], Foo.argv)

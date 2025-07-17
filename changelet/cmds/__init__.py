@@ -5,34 +5,22 @@ from sys import argv
 
 from changelet.base import Bump, Check, Create
 
-
-def create(argv):
-    cmd = Create()
-    args = cmd.parse(argv)
-    cmd.run(args)
+cmds = {}
 
 
-def check(argv):
-    cmd = Check()
-    args = cmd.parse(argv)
-    cmd.run(args)
+def register_cmd(command, klass):
+    cmds[command] = klass
 
 
-def bump(argv):
-    cmd = Bump()
-    args = cmd.parse(argv)
-    cmd.run(args)
+register_cmd('create', Create)
+register_cmd('check', Check)
+register_cmd('bump', Bump)
 
 
-cmds = {'create': create, 'check': check, 'bump': bump}
-
-
-def general_usage(msg=None):
-    global cmds
-
+def general_usage(argv, msg=None):
     exe = basename(argv[0])
-    cmds = ','.join(sorted(cmds.keys()))
-    print(f'usage: {exe} {{{cmds}}} ...')
+    options = ','.join(sorted(cmds.keys()))
+    print(f'usage: {exe} {{{options}}} ...')
     if msg:
         print(msg)
     else:
@@ -45,22 +33,30 @@ based on one or more entries in that directory.
         )
 
 
-def main():
+def main(argv):
     try:
-        cmd = cmds[argv[1].lower()]
+        from pprint import pprint
+
+        pprint(cmds)
+        Cmd = cmds[argv[1].lower()]
         argv.pop(1)
     except IndexError:
-        general_usage('missing command')
+        general_usage(argv, 'missing command')
         exit(1)
+        return
     except KeyError:
         if argv[1] in ('-h', '--help', 'help'):
-            general_usage()
+            general_usage(argv)
             exit(0)
-        general_usage(f'unknown command "{argv[1]}"')
+            return
+        general_usage(argv, f'unknown command "{argv[1]}"')
         exit(1)
+        return
 
-    cmd(argv)
+    cmd = Cmd()
+    args = cmd.parse(argv)
+    cmd.run(args)
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__':  # pragma: no cover
+    main(argv)
