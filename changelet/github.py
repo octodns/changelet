@@ -13,16 +13,13 @@ from .pr import Pr
 
 class GitHubCli:
 
-    def __init__(self, org, repo, changelog_directory, max_lookback=50):
-        self.log = getLogger('GitHubCli[{org}/{repo}]')
+    def __init__(self, directory, repo=None, max_lookback=50):
+        self.log = getLogger('GitHubCli[{repo}]')
         self.log.info(
-            '__init__: changelog_directory=%s, max_lookback=%d',
-            changelog_directory,
-            max_lookback,
+            '__init__: directory=%s, max_lookback=%d', directory, max_lookback
         )
-        self.org = org
         self.repo = repo
-        self.changelog_directory = changelog_directory
+        self.directory = directory
         self.max_lookback = max_lookback
 
         self._prs = None
@@ -33,34 +30,31 @@ class GitHubCli:
             # will be indexed by both id & filename
             prs = {}
 
-            result = run(
-                [
-                    'gh',
-                    'pr',
-                    'list',
-                    '--repo',
-                    f'{self.org}/{self.repo}',
-                    '--base',
-                    'main',
-                    '--state',
-                    'merged',
-                    f'--limit={self.max_lookback}',
-                    '--json',
-                    'files,mergedAt,number',
-                ],
-                check=True,
-                stdout=PIPE,
-            )
+            cmd = [
+                'gh',
+                'pr',
+                'list',
+                '--base',
+                'main',
+                '--state',
+                'merged',
+                f'--limit={self.max_lookback}',
+                '--json',
+                'files,mergedAt,number',
+            ]
+            if self.repo:
+                cmd.extend(('--repo', f'{self.repo}'))
+            result = run(cmd, check=True, stdout=PIPE)
 
             for pr in loads(result.stdout):
                 number = pr['number']
-                url = f'https://github.com/{self.org}/{self.repo}/pull/{number}'
+                url = f'https://github.com/{self.repo}/pull/{number}'
                 merged_at = datetime.fromisoformat(pr['mergedAt'])
 
                 files = [
                     f['path']
                     for f in pr['files']
-                    if f['path'].startswith(self.changelog_directory)
+                    if f['path'].startswith(self.directory)
                 ]
                 if not files:
                     # no changelog entries, ignore it

@@ -17,14 +17,14 @@ class TestGitHubCli(TestCase):
             self.stdout = stdout
 
     def test_pr_by_id(self):
-        gh = GitHubCli('org', 'repo', '.changelog')
+        gh = GitHubCli(directory='.changelog')
         # pre-fill the cache
         gh._prs = {42: 'pr'}
         self.assertEqual('pr', gh.pr_by_id(42))
         self.assertIsNone(gh.pr_by_id(43))
 
     def test_pr_by_filename(self):
-        gh = GitHubCli('org', 'repo', '.changelog')
+        gh = GitHubCli(directory='.changelog')
         # pre-fill the cache
         gh._prs = {'.changelog/abc123.md': 'pr'}
         self.assertEqual('pr', gh.pr_by_filename('.changelog/abc123.md'))
@@ -32,20 +32,20 @@ class TestGitHubCli(TestCase):
 
     @patch('changelet.github.run')
     def test_cache_filling_cmd_params_default(self, run_mock):
-        gh = GitHubCli('org', 'repo', '.changelog')
+        gh = GitHubCli(directory='.changelog')
 
         run_mock.return_value = self.ResultMock('[]')
         self.assertEqual({}, gh.prs)
         run_mock.assert_called_once()
         args = run_mock.call_args[0][0]
-        # make sure our org and repo are part of the call params
-        self.assertTrue('org/repo' in args)
+        # make sure our repo was not part of the call params
+        self.assertFalse('--repo' in args)
         # make sure the default limit is applied
         self.assertTrue('--limit=50' in args)
 
     @patch('changelet.github.run')
     def test_cache_filling_cmd_params(self, run_mock):
-        gh = GitHubCli('org', 'repo', '.changelog', max_lookback=75)
+        gh = GitHubCli(directory='.changelog', max_lookback=75, repo='org/repo')
 
         run_mock.return_value = self.ResultMock('[]')
         self.assertEqual({}, gh.prs)
@@ -58,7 +58,7 @@ class TestGitHubCli(TestCase):
 
     @patch('changelet.github.run')
     def test_cache_filling_parsing(self, run_mock):
-        gh = GitHubCli('org', 'repo', '.changelog', max_lookback=75)
+        gh = GitHubCli(directory='.changelog')
 
         run_mock.return_value = self.ResultMock(
             dumps(
