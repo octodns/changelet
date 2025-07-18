@@ -9,10 +9,10 @@ from io import StringIO
 from json import dumps
 from os import makedirs
 from os.path import join
-from shutil import rmtree
-from tempfile import mkdtemp
 from unittest import TestCase
 from unittest.mock import call, patch
+
+from helpers import TemporaryDirectory
 
 from changelet.base import (
     Bump,
@@ -27,21 +27,6 @@ from changelet.base import (
 from changelet.cmds import general_usage
 from changelet.cmds import main as cmds_main
 from changelet.cmds import register_cmd
-
-
-class TemporaryDirectory(object):
-    def __init__(self, delete_on_exit=True):
-        self.delete_on_exit = delete_on_exit
-
-    def __enter__(self):
-        self.dirname = mkdtemp()
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        if self.delete_on_exit:
-            rmtree(self.dirname)
-        else:
-            raise Exception(self.dirname)
 
 
 class TestCreate(TestCase):
