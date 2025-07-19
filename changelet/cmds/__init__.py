@@ -35,9 +35,6 @@ based on one or more entries in that directory.
 
 def main(argv):
     try:
-        from pprint import pprint
-
-        pprint(cmds)
         Cmd = cmds[argv[1].lower()]
         argv.pop(1)
     except IndexError:
