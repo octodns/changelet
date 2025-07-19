@@ -18,6 +18,10 @@ class TestConfig(TestCase):
         def __init__(self, directory):
             self.directory = directory
 
+    def test_repr(self):
+        # smoke
+        Config.build().__repr__()
+
     def test_base(self):
         config = Config(
             directory='.foo', provider={'class': self.DummyProvider}
@@ -44,6 +48,11 @@ class TestConfig(TestCase):
         provider = config.provider
         self.assertEqual('octodns/changelet', provider.repo)
         self.assertEqual('.changelog', provider.directory)
+
+    def test_build_default(self):
+        config = Config.build_default()
+        self.assertEqual('./.changelog', config.directory)
+        self.assertIsInstance(config.provider, GitHubCli)
 
     def test_build_pyproject_toml(self):
         with TemporaryDirectory() as td:
@@ -75,8 +84,11 @@ provider.repo = "org/repo"
             self.assertIsInstance(config.provider, GitHubCli)
             self.assertEqual('org/repo', config.provider.repo)
 
+            # load pyproject.toml via precedence
             config = Config.build(td.dirname)
-            self.assertTrue(config)
+            self.assertEqual('.location', config.directory)
+            self.assertIsInstance(config.provider, GitHubCli)
+            self.assertEqual('org/repo', config.provider.repo)
 
     def test_build_changelet_yaml(self):
         with TemporaryDirectory() as td:
@@ -108,5 +120,12 @@ provider:
             self.assertIsInstance(config.provider, GitHubCli)
             self.assertEqual('org/repo', config.provider.repo)
 
+            # create a pyproject.toml to make sure that .changelet.yaml takes
+            # precedence
+            with open(join(td.dirname, 'pyproject.toml'), 'w') as fh:
+                fh.write('\n')
+
             config = Config.build(td.dirname)
-            self.assertTrue(config)
+            self.assertEqual('.location', config.directory)
+            self.assertIsInstance(config.provider, GitHubCli)
+            self.assertEqual('org/repo', config.provider.repo)

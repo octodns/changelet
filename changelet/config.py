@@ -25,6 +25,14 @@ else:  # pragma: no cover
 class Config:
 
     @classmethod
+    def build_default(cls, directory='.'):
+        directory = join(directory, '.changelog')
+        return Config(
+            directory=directory,
+            provider={'class': 'changelet.github.GitHubCli'},
+        )
+
+    @classmethod
     def build_pyproject_toml(cls, directory='.'):
         pyproject_toml = join(directory, 'pyproject.toml')
         if isfile(pyproject_toml):
@@ -44,9 +52,11 @@ class Config:
 
     @classmethod
     def build(cls, directory='.'):
-        return cls.build_changelet_yaml(
-            directory=directory
-        ) or cls.build_pyproject_toml(directory=directory)
+        return (
+            cls.build_changelet_yaml(directory=directory)
+            or cls.build_pyproject_toml(directory=directory)
+            or cls.build_default(directory=directory)
+        )
 
     def __init__(self, directory='.changelog', provider=None):
         self.directory = directory
@@ -65,3 +75,6 @@ class Config:
                 klass = getattr(module, klass)
             self._provider = klass(directory=self.directory, **config)
         return self._provider
+
+    def __repr__(self):
+        return f'Config<directory={self.directory}, provider={self.provider}>'

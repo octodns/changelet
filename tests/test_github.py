@@ -16,6 +16,10 @@ class TestGitHubCli(TestCase):
         def __init__(self, stdout):
             self.stdout = stdout
 
+    def test_repr(self):
+        # smoke
+        GitHubCli(directory='.changelog').__repr__()
+
     def test_pr_by_id(self):
         gh = GitHubCli(directory='.changelog')
         # pre-fill the cache

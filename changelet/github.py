@@ -75,3 +75,6 @@ class GitHubCli:
 
     def pr_by_filename(self, filename):
         return self.prs.get(filename)
+
+    def __repr__(self):
+        return f'GitHubCli<directory={self.directory}, repo={self.repo}, max_lookback={self.max_lookback}>'
