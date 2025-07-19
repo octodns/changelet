@@ -51,7 +51,7 @@ class Config:
                     return Config(**config)
 
     @classmethod
-    def build(cls, directory='.'):
+    def build(cls, config=None, directory='.'):
         return (
             cls.build_changelet_yaml(directory=directory)
             or cls.build_pyproject_toml(directory=directory)

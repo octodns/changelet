@@ -134,7 +134,7 @@ class Bump:
             'title', nargs='+', help='A short title/quip for the release title'
         )
 
-    def run(self, args, directory='.'):
+    def run(self, args, config, directory='.'):
         buf = StringIO()
 
         cwd = getcwd()

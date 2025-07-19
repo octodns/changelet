@@ -16,7 +16,7 @@ class Check:
     def configure(self, parser):
         return None
 
-    def run(self, args, directory='.'):
+    def run(self, args, config, directory='.'):
         directory = join(directory, '.changelog')
         if isdir(directory):
             result = run(
@@ -29,7 +29,6 @@ class Check:
                 for l in result.stdout.decode('utf-8').split()
                 if l.endswith('.md')
             }
-            print(f'code={result.returncode}, entries={entries}')
             if not result.returncode and entries:
                 exit(0)
                 return True

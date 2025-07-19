@@ -51,7 +51,7 @@ CHANGELOG.md. Should be a single line. Can option include simple markdown format
 and links.''',
         )
 
-    def run(self, args, directory='.'):
+    def run(self, args, config, directory='.'):
         directory = join(directory, '.changelog')
         if not isdir(directory):
             makedirs(directory)
@@ -63,7 +63,7 @@ and links.''',
                 fh.write('\npr: ')
                 fh.write(str(args.pr))
             fh.write('\n---\n')
-            fh.write(' '.join(args.md))
+            fh.write(' '.join(args.description))
 
         if args.add:
             run(['git', 'add', filepath])
