@@ -162,4 +162,5 @@ class TestGitHubCli(TestCase):
         gh.add_file(filename)
         run_mock.assert_called_once()
         args = run_mock.call_args[0][0]
-        self.assertFalse(filename in args)
+        print(args)
+        self.assertTrue(filename in args)

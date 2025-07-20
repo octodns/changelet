@@ -134,6 +134,9 @@ class Bump:
             'title', nargs='+', help='A short title/quip for the release title'
         )
 
+    def exit(self, code):
+        exit(code)
+
     def run(self, args, config, directory='.'):
         buf = StringIO()
 
@@ -146,8 +149,7 @@ class Bump:
         new_version = _get_new_version(current_version, changelogs)
         if not new_version:
             print('No changelog entries found that would bump, nothing to do')
-            exit(1)
-            return
+            return self.exit(1)
         new_version = _format_version(new_version)
         buf.write(new_version)
         buf.write(' - ')
@@ -193,7 +195,7 @@ class Bump:
         if not args.make_changes:
             print(f'New version number {new_version}\n')
             print(buf)
-            exit(0)
+            return self.exit(0)
         else:
             changelog = join(directory, 'CHANGELOG.md')
             print(f'changelog={changelog}')
