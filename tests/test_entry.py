@@ -34,12 +34,14 @@ class TestEntry(TestCase):
 
         with TemporaryDirectory() as td:
             type = 'none'
-            message = 'This does not matter'
+            description = 'This does not matter'
             directory = join(td.dirname, '.changelog')
             filename = join(directory, 'the-change.md')
-            entry = Entry(type=type, message=message, pr=pr, filename=filename)
+            entry = Entry(
+                type=type, description=description, pr=pr, filename=filename
+            )
             self.assertEqual(type, entry.type)
-            self.assertEqual(message, entry.message)
+            self.assertEqual(description, entry.description)
             self.assertEqual(pr, entry.pr)
             self.assertEqual(filename, entry.filename)
 
@@ -55,7 +57,7 @@ class TestEntry(TestCase):
                 self.assertEqual(type, data['type'])
                 # we gave it a PR before safe so it's id be recorded in there
                 self.assertEqual(pr.id, data['pr'])
-                self.assertEqual(message, pieces[2])
+                self.assertEqual(description, pieces[2])
 
             # load what was saved
             loaded = Entry.load(filename, provider)
@@ -89,24 +91,28 @@ class TestEntry(TestCase):
 
     def test_text(self):
         type = 'none'
-        message = 'This does not matter'
+        description = 'This does not matter'
         filename = join('.changelog', 'the-change.md')
-        entry = Entry(type=type, message=message, filename=filename)
-        self.assertEqual(f'* {message}', entry.text)
+        entry = Entry(type=type, description=description, filename=filename)
+        self.assertEqual(f'* {description}', entry.text)
 
         provider = DummyProvider()
         pr = provider.pr_by_id(43)
-        entry = Entry(type=type, message=message, pr=pr, filename=filename)
-        self.assertEqual(f'* {message} - {pr.url}', entry.text)
+        entry = Entry(
+            type=type, description=description, pr=pr, filename=filename
+        )
+        self.assertEqual(f'* {description} - {pr.url}', entry.text)
 
     def test_sorting(self):
         type = 'none'
-        message = 'This does not matter'
+        description = 'This does not matter'
         filename = join('.changelog', 'the-change.md')
-        entry = Entry(type=type, message=message, filename=filename)
-        self.assertEqual(f'* {message}', entry.markdown)
+        entry = Entry(type=type, description=description, filename=filename)
+        self.assertEqual(f'* {description}', entry.markdown)
 
         provider = DummyProvider()
         pr = provider.pr_by_id(43)
-        entry = Entry(type=type, message=message, pr=pr, filename=filename)
-        self.assertEqual(f'* {message} - {pr.markdown}', entry.markdown)
+        entry = Entry(
+            type=type, description=description, pr=pr, filename=filename
+        )
+        self.assertEqual(f'* {description} - {pr.markdown}', entry.markdown)

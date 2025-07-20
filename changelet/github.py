@@ -92,5 +92,8 @@ class GitHubCli:
             if l.endswith('.md')
         }
 
+    def add_file(self, filename):
+        run(['git', 'add', filename], check=True)
+
     def __repr__(self):
         return f'GitHubCli<directory={self.directory}, repo={self.repo}, max_lookback={self.max_lookback}>'

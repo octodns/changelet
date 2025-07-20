@@ -152,3 +152,14 @@ class TestGitHubCli(TestCase):
         )
         self.assertEqual({'.foobar/blip.md'}, gh.changelog_entries_in_branch())
         run_mock.assert_called_once()
+
+    @patch('changelet.github.run')
+    def test_add_file(self, run_mock):
+        gh = GitHubCli(directory='baz')
+        filename = 'foo.bar'
+
+        run_mock.reset_mock()
+        gh.add_file(filename)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertFalse(filename in args)

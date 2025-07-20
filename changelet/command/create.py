@@ -4,8 +4,9 @@
 
 from os import makedirs
 from os.path import isdir, join
-from subprocess import run
 from uuid import uuid4
+
+from changelet.entry import Entry
 
 
 class Create:
@@ -51,28 +52,26 @@ CHANGELOG.md. Should be a single line. Can option include simple markdown format
 and links.''',
         )
 
-    def run(self, args, config, directory='.'):
-        directory = join(directory, '.changelog')
-        if not isdir(directory):
-            makedirs(directory)
-        filepath = join(directory, f'{uuid4().hex}.md')
-        with open(filepath, 'w') as fh:
-            fh.write('---\ntype: ')
-            fh.write(args.type)
-            if args.pr:
-                fh.write('\npr: ')
-                fh.write(str(args.pr))
-            fh.write('\n---\n')
-            fh.write(' '.join(args.description))
+    def run(self, args, config):
+        if not isdir(config.directory):
+            makedirs(config.directory)
+        filename = join(config.directory, f'{uuid4().hex}.md')
+        entry = Entry(
+            type=args.type,
+            description=' '.join(args.description),
+            pr=args.pr,
+            filename=filename,
+        )
+        entry.save()
 
         if args.add:
-            run(['git', 'add', filepath])
+            config.provider.add_file(entry.filename)
             print(
-                f'Created {filepath}, it has been staged and should be committed to your branch.'
+                f'Created {entry.filename}, it has been staged and should be committed to your branch.'
             )
         else:
             print(
-                f'Created {filepath}, it can be further edited and should be committed to your branch.'
+                f'Created {entry.filename}, it can be further edited and should be committed to your branch.'
             )
 
-        return filepath
+        return entry.filename
