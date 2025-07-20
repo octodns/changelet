@@ -58,7 +58,7 @@ class Config:
             or cls.build_default(directory=directory)
         )
 
-    def __init__(self, directory='.changelog', provider=None):
+    def __init__(self, directory, provider):
         self.directory = directory
 
         self._provider_config = provider

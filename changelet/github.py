@@ -6,6 +6,7 @@
 from datetime import datetime
 from json import loads
 from logging import getLogger
+from os.path import isdir
 from subprocess import PIPE, run
 
 from .pr import Pr
@@ -75,6 +76,21 @@ class GitHubCli:
 
     def pr_by_filename(self, filename):
         return self.prs.get(filename)
+
+    def changelog_entries_in_branch(self):
+        # TODO: automatically figure our main branch or configure it
+        if not isdir(self.directory):
+            return set()
+        result = run(
+            ['git', 'diff', '--name-only', 'origin/main', self.directory],
+            check=False,
+            stdout=PIPE,
+        )
+        return {
+            l
+            for l in result.stdout.decode('utf-8').split()
+            if l.endswith('.md')
+        }
 
     def __repr__(self):
         return f'GitHubCli<directory={self.directory}, repo={self.repo}, max_lookback={self.max_lookback}>'

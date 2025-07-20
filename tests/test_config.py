@@ -40,10 +40,11 @@ class TestConfig(TestCase):
         self.assertIsInstance(config.provider, self.DummyProvider)
 
         config = Config(
+            directory='.changelog',
             provider={
                 'class': 'changelet.github.GitHubCli',
                 'repo': 'octodns/changelet',
-            }
+            },
         )
         provider = config.provider
         self.assertEqual('octodns/changelet', provider.repo)
@@ -85,7 +86,7 @@ provider.repo = "org/repo"
             self.assertEqual('org/repo', config.provider.repo)
 
             # load pyproject.toml via precedence
-            config = Config.build(td.dirname)
+            config = Config.build(directory=td.dirname)
             self.assertEqual('.location', config.directory)
             self.assertIsInstance(config.provider, GitHubCli)
             self.assertEqual('org/repo', config.provider.repo)
@@ -125,7 +126,7 @@ provider:
             with open(join(td.dirname, 'pyproject.toml'), 'w') as fh:
                 fh.write('\n')
 
-            config = Config.build(td.dirname)
+            config = Config.build(directory=td.dirname)
             self.assertEqual('.location', config.directory)
             self.assertIsInstance(config.provider, GitHubCli)
             self.assertEqual('org/repo', config.provider.repo)

@@ -110,3 +110,45 @@ class TestGitHubCli(TestCase):
         pr = gh.prs['43']
         self.assertEqual('43', pr.id)
         run_mock.assert_called_once()
+
+    @patch('changelet.github.isdir')
+    @patch('changelet.github.run')
+    def test_changelog_entries_in_branch(self, run_mock, isdir_mock):
+        directory = '.foobar'
+        gh = GitHubCli(directory=directory)
+
+        # no directory
+        isdir_mock.reset_mock()
+        run_mock.reset_mock()
+        isdir_mock.return_value = False
+        self.assertEqual(set(), gh.changelog_entries_in_branch())
+        isdir_mock.assert_called_once_with(directory)
+        run_mock.assert_not_called()
+
+        # fake the dir existing
+        isdir_mock.return_value = True
+
+        # no changes
+        isdir_mock.reset_mock()
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(b'')
+        self.assertEqual(set(), gh.changelog_entries_in_branch())
+        isdir_mock.assert_called_once_with(directory)
+        run_mock.assert_called_once()
+        # custom directory was used in command
+        args = run_mock.call_args[0][0]
+        self.assertEqual(directory, args[-1])
+
+        # non changelog changes
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(b'foo/bar.py')
+        self.assertEqual(set(), gh.changelog_entries_in_branch())
+        run_mock.assert_called_once()
+
+        # changelog changes
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(
+            b'foo/bar.py\n.foobar/blip.md\nother.txt'
+        )
+        self.assertEqual({'.foobar/blip.md'}, gh.changelog_entries_in_branch())
+        run_mock.assert_called_once()

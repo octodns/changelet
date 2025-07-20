@@ -2,9 +2,7 @@
 #
 #
 
-from os.path import isdir, join
-from subprocess import PIPE, run
-from sys import exit, stderr
+from sys import argv, exit, stderr
 
 
 class Check:
@@ -16,26 +14,15 @@ class Check:
     def configure(self, parser):
         return None
 
-    def run(self, args, config, directory='.'):
-        directory = join(directory, '.changelog')
-        if isdir(directory):
-            result = run(
-                ['git', 'diff', '--name-only', 'origin/main', directory],
-                check=False,
-                stdout=PIPE,
-            )
-            entries = {
-                l
-                for l in result.stdout.decode('utf-8').split()
-                if l.endswith('.md')
-            }
-            if not result.returncode and entries:
-                exit(0)
-                return True
+    def exit(self, code):
+        exit(code)
+
+    def run(self, args, config):
+        if config.provider.changelog_entries_in_branch():
+            return self.exit(0)
 
         print(
-            'PR is missing required changelog file, run changelet create',
+            f'PR is missing required changelog file, run {argv[0]} create',
             file=stderr,
         )
-        exit(1)
-        return False
+        self.exit(1)
