@@ -12,6 +12,12 @@ from changelet.command.create import Create
 
 class TestCommand(TestCase):
 
+    def tearDown(self):
+        try:
+            del commands['dummy']
+        except KeyError:
+            pass
+
     def test_register(self):
         self.assertEqual(['bump', 'check', 'create'], list(commands.keys()))
         self.assertIsInstance(commands['bump'], Bump)
