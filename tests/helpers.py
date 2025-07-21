@@ -19,3 +19,15 @@ class TemporaryDirectory(object):
             rmtree(self.dirname)
         else:
             raise Exception(self.dirname)
+
+
+class AssertActionMixin:
+    def assert_action(
+        self, action, flags, default, nargs=0, required=False, choices=None
+    ):
+        self.assertEqual(flags, action.option_strings)
+        self.assertEqual(default, action.default)
+        if choices is not None:
+            self.assertEqual(choices, set(action.choices))
+        self.assertEqual(required, action.required)
+        self.assertTrue(action.help)

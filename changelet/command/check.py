@@ -12,7 +12,7 @@ class Check:
     )
 
     def configure(self, parser):
-        return None
+        pass
 
     def exit(self, code):
         exit(code)

@@ -74,4 +74,4 @@ and links.''',
                 f'Created {entry.filename}, it can be further edited and should be committed to your branch.'
             )
 
-        return entry.filename
+        return entry
