@@ -2,8 +2,7 @@
 #
 #
 
-from os import makedirs
-from os.path import isdir, join
+from os.path import join
 from uuid import uuid4
 
 from changelet.entry import Entry
@@ -53,8 +52,6 @@ and links.''',
         )
 
     def run(self, args, config):
-        if not isdir(config.directory):
-            makedirs(config.directory)
         filename = join(config.directory, f'{uuid4().hex}.md')
         entry = Entry(
             type=args.type,

@@ -43,8 +43,7 @@ class TestCommandCreate(TestCase, AssertActionMixin):
         )
 
     @patch('changelet.entry.Entry.save')
-    @patch('changelet.command.create.isdir')
-    def test_run(self, isdir_mock, save_mock):
+    def test_run(self, save_mock):
 
         class ArgsMock:
 
@@ -64,28 +63,21 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             create = Create()
 
             # directory doesn't exist, will be created
-            isdir_mock.reset_mock()
             save_mock.reset_mock()
-            isdir_mock.return_value = False
-            with patch('changelet.command.create.makedirs') as makedirs_mock:
-                entry = create.run(args, config)
-                # args made it through
-                self.assertEqual(type, entry.type)
-                self.assertEqual(description, entry.description)
-                self.assertIsNone(entry.pr)
-                filename = entry.filename
-                self.assertTrue(filename.startswith(directory))
-                self.assertTrue(filename.endswith('.md'))
-                makedirs_mock.assert_called_once()
-            isdir_mock.assert_called_once_with(directory)
+            entry = create.run(args, config)
+            # args made it through
+            self.assertEqual(type, entry.type)
+            self.assertEqual(description, entry.description)
+            self.assertIsNone(entry.pr)
+            filename = entry.filename
+            self.assertTrue(filename.startswith(directory))
+            self.assertTrue(filename.endswith('.md'))
             save_mock.assert_called_once()
             # add wasn't called
             provider_mock.add_file.assert_not_called()
 
             # directory exist
-            isdir_mock.reset_mock()
             save_mock.reset_mock()
-            isdir_mock.return_value = True
             args.pr = pr = 43
             args.add = True
             entry = create.run(args, config)
@@ -96,6 +88,5 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             # new filename
             new_filename = entry.filename
             self.assertNotEqual(filename, new_filename)
-            isdir_mock.assert_called_once_with(directory)
             save_mock.assert_called_once()
             provider_mock.add_file.assert_called_once_with(new_filename)

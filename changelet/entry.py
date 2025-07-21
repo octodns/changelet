@@ -2,7 +2,10 @@
 #
 #
 
+from datetime import datetime
 from enum import Enum
+from os import listdir, makedirs, remove
+from os.path import dirname, isdir, join
 
 from yaml import safe_load
 
@@ -15,9 +18,11 @@ class EntryType(Enum):
 
 
 class Entry:
+    EPOCH = datetime(1970, 1, 1)
+    ORDERING = {'major': 3, 'minor': 2, 'patch': 1, 'none': 0, '': 0}
 
     @classmethod
-    def load(self, filename, provider):
+    def load(self, filename, config):
         with open(filename, 'r') as fh:
             pieces = fh.read().split('---\n')
             data = safe_load(pieces[1])
@@ -25,9 +30,9 @@ class Entry:
             if description[-1] == '\n':
                 description = description[:-1]
             if 'pr' in data:
-                pr = provider.pr_by_id(data['pr'])
+                pr = config.provider.pr_by_id(data['pr'])
             else:
-                pr = provider.pr_by_filename(filename)
+                pr = config.provider.pr_by_filename(filename)
             return Entry(
                 filename=filename,
                 type=data['type'],
@@ -35,15 +40,39 @@ class Entry:
                 pr=pr,
             )
 
+    @classmethod
+    def load_all(cls, config):
+        directory = config.directory
+        entries = []
+        if isdir(directory):
+            for filename in sorted(listdir(directory)):
+                if not filename.endswith('.md'):
+                    continue
+                filename = join(directory, filename)
+                entries.append(Entry.load(filename, config))
+        return entries
+
     def __init__(self, type, description, pr=None, filename=None):
         self.type = type
         self.description = description
         self.pr = pr
         self.filename = filename
 
+    @property
+    def _ordering(self):
+        return (
+            self.ORDERING[self.type],
+            self.pr.merged_at if self.pr else self.EPOCH,
+        )
+
     def save(self, filename=None):
         if filename is None:
             filename = self.filename
+        directory = dirname(filename)
+        print(f'directory={directory}')
+        if not isdir(directory):
+            print('making')
+            makedirs(directory)
         with open(filename, 'w') as fh:
             fh.write('---\ntype: ')
             fh.write(self.type)
@@ -53,6 +82,12 @@ class Entry:
             fh.write('\n---\n')
             fh.write(self.description)
         self.filename = filename
+
+    def remove(self):
+        if not self.filename:
+            return False
+        remove(self.filename)
+        return True
 
     @property
     def text(self):
@@ -74,9 +109,5 @@ class Entry:
             filename=self.filename,
         )
 
-    def __eq__(self, other):
-        return (self.filename, self.type, self.description) == (
-            other.filename,
-            other.type,
-            other.description,
-        )
+    def __lt__(self, other):
+        return self._ordering < other._ordering

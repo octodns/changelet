@@ -5,13 +5,10 @@
 from datetime import datetime
 from importlib import import_module
 from io import StringIO
-from json import loads
-from os import getcwd, listdir, remove
-from os.path import basename, join
-from subprocess import PIPE, run
+from os.path import abspath, basename, join
 from sys import exit, path
 
-from yaml import safe_load
+from changelet.entry import Entry
 
 
 def _get_current_version(module_name, directory='.'):
@@ -21,82 +18,9 @@ def _get_current_version(module_name, directory='.'):
     return tuple(int(v) for v in module.__version__.split('.', 2))
 
 
-class _ChangeMeta:
-    _pr_cache = None
-
-    @classmethod
-    def get(cls, filepath, data):
-        if 'pr' in data:
-            return data['pr'], datetime(year=1970, month=1, day=1)
-        if cls._pr_cache is None:
-            result = run(
-                [
-                    'gh',
-                    'pr',
-                    'list',
-                    '--base',
-                    'main',
-                    '--state',
-                    'merged',
-                    '--limit=50',
-                    '--json',
-                    'files,mergedAt,number',
-                ],
-                check=True,
-                stdout=PIPE,
-            )
-            cls._pr_cache = {}
-            for pr in loads(result.stdout):
-                for file in pr['files']:
-                    path = file['path']
-                    if path.startswith('.changelog'):
-                        cls._pr_cache[path] = (
-                            pr['number'],
-                            datetime.fromisoformat(pr['mergedAt']).replace(
-                                tzinfo=None
-                            ),
-                        )
-
-        try:
-            return cls._pr_cache[filepath]
-        except KeyError:
-            # couldn't find a PR with the changelog file in it
-            return None, datetime(year=1970, month=1, day=1)
-
-
-def _get_changelogs(directory):
-    ret = []
-    for filename in sorted(listdir(directory)):
-        if not filename.endswith('.md'):
-            continue
-        filepath = join(directory, filename)
-        with open(filepath) as fh:
-            pieces = fh.read().split('---\n')
-            data = safe_load(pieces[1])
-            md = pieces[2]
-            if md[-1] == '\n':
-                md = md[:-1]
-        pr, time = _ChangeMeta.get(filepath, data)
-        if pr is None:
-            continue
-        ret.append(
-            {
-                'filepath': filepath,
-                'md': md,
-                'pr': pr,
-                'time': time,
-                'type': data.get('type', '').lower(),
-            }
-        )
-
-    ordering = {'major': 3, 'minor': 2, 'patch': 1, 'none': 0, '': 0}
-    ret.sort(key=lambda c: (ordering[c['type']], c['time']), reverse=True)
-    return ret
-
-
-def _get_new_version(current_version, changelogs):
+def _get_new_version(current_version, entries):
     try:
-        bump_type = changelogs[0]['type']
+        bump_type = entries[0].type
     except IndexError:
         return None
     new_version = list(current_version)
@@ -137,16 +61,17 @@ class Bump:
     def exit(self, code):
         exit(code)
 
-    def run(self, args, config, directory='.'):
+    def run(self, args, config, root='.'):
         buf = StringIO()
 
-        cwd = getcwd()
-        module_name = basename(cwd).replace('-', '_')
+        module_name = basename(abspath(root)).replace('-', '_')
 
         buf.write('## ')
         current_version = _get_current_version(module_name)
-        changelogs = _get_changelogs(join(directory, '.changelog'))
-        new_version = _get_new_version(current_version, changelogs)
+
+        entries = sorted(Entry.load_all(config), reverse=True)
+
+        new_version = _get_new_version(current_version, entries)
         if not new_version:
             print('No changelog entries found that would bump, nothing to do')
             return self.exit(1)
@@ -159,33 +84,17 @@ class Bump:
         buf.write('\n')
 
         current_type = None
-        for changelog in changelogs:
-            md = changelog['md']
-            if not md:
-                continue
-
-            _type = changelog['type']
-            if _type == 'none':
+        for entry in entries:
+            type = entry.type
+            if type == 'none':
                 # these aren't included in the listing
                 continue
-            if _type != current_type:
+            if type != current_type:
                 buf.write('\n')
-                buf.write(_type.capitalize())
+                buf.write(type.capitalize())
                 buf.write(':\n')
-                current_type = _type
-            buf.write('* ')
-            buf.write(md)
-
-            pr = changelog['pr']
-            if pr:
-                pr = str(pr)
-                buf.write(' [#')
-                buf.write(pr)
-                buf.write('](https://github.com/octodns/')
-                buf.write(module_name)
-                buf.write('/pull/')
-                buf.write(pr)
-                buf.write(')')
+                current_type = type
+            buf.write(entry.markdown)
 
             buf.write('\n')
 
@@ -195,9 +104,9 @@ class Bump:
         if not args.make_changes:
             print(f'New version number {new_version}\n')
             print(buf)
-            return self.exit(0)
+            self.exit(0)
         else:
-            changelog = join(directory, 'CHANGELOG.md')
+            changelog = join(root, 'CHANGELOG.md')
             print(f'changelog={changelog}')
             with open(changelog) as fh:
                 existing = fh.read()
@@ -206,7 +115,7 @@ class Bump:
                 fh.write(buf)
                 fh.write(existing)
 
-            init = join(directory, module_name, '__init__.py')
+            init = join(root, module_name, '__init__.py')
             with open(init) as fh:
                 existing = fh.read()
 
@@ -214,8 +123,7 @@ class Bump:
             with open(init, 'w') as fh:
                 fh.write(existing.replace(current_version, new_version))
 
-            for changelog in changelogs:
-                filepath = join(directory, changelog['filepath'])
-                remove(filepath)
+            for entry in entries:
+                entry.remove()
 
         return new_version, buf
