@@ -52,7 +52,7 @@ class TestConfig(TestCase):
 
     def test_build_default(self):
         config = Config.build_default()
-        self.assertEqual('./.changelog', config.directory)
+        self.assertEqual('.changelog', config.directory)
         self.assertIsInstance(config.provider, GitHubCli)
 
     def test_build_pyproject_toml(self):

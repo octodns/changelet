@@ -25,7 +25,7 @@ else:  # pragma: no cover
 class Config:
 
     @classmethod
-    def build_default(cls, directory='.'):
+    def build_default(cls, directory=''):
         directory = join(directory, '.changelog')
         return Config(
             directory=directory,
@@ -33,7 +33,7 @@ class Config:
         )
 
     @classmethod
-    def build_pyproject_toml(cls, directory='.'):
+    def build_pyproject_toml(cls, directory=''):
         pyproject_toml = join(directory, 'pyproject.toml')
         if isfile(pyproject_toml):
             with open(pyproject_toml, 'rb') as fh:
@@ -42,7 +42,7 @@ class Config:
                     return Config(**config)
 
     @classmethod
-    def build_changelet_yaml(cls, directory='.'):
+    def build_changelet_yaml(cls, directory=''):
         changelet_yaml = join(directory, '.changelet.yaml')
         if isfile(changelet_yaml):
             with open(changelet_yaml, 'rb') as fh:
@@ -51,7 +51,7 @@ class Config:
                     return Config(**config)
 
     @classmethod
-    def build(cls, config=None, directory='.'):
+    def build(cls, config=None, directory=''):
         return (
             cls.build_changelet_yaml(directory=directory)
             or cls.build_pyproject_toml(directory=directory)
