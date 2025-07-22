@@ -3,6 +3,7 @@
 #
 
 from argparse import ArgumentError
+from sys import version_info
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -11,14 +12,26 @@ from changelet.main import main
 
 class TestMain(TestCase):
 
-    def test_main(self):
+    def test_missing_command(self):
         # missing command
-        with self.assertRaises(ArgumentError) as ctx:
-            main(['e*e'], exit_on_error=False)
-        self.assertEqual(
-            'the following arguments are required: command', str(ctx.exception)
-        )
+        if version_info.minor > 11:
+            ctx = self.assertRaises(ArgumentError)
+        else:  # < 12
+            # older versions of argparse exit even when told not to
+            ctx = patch('argparse.ArgumentParser.exit')
 
+        with ctx as ctx:
+            main(['e*e'], exit_on_error=False)
+
+        if version_info.minor > 11:
+            self.assertEqual(
+                'the following arguments are required: command',
+                str(ctx.exception),
+            )
+        else:
+            ctx.assert_called_once()
+
+    def test_success(self):
         # has command, should be run, expect check to exit, don't care about
         # with what code
         with patch('changelet.command.check.exit') as exit_mock:
