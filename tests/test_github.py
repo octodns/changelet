@@ -69,7 +69,7 @@ class TestGitHubCli(TestCase):
                 [
                     {
                         'files': [{'path': '.changelog/abcd1234.md'}],
-                        'mergedAt': '2025-07-01T10:42Z',
+                        'mergedAt': '2025-07-01T10:42',
                         'number': '42',
                     },
                     {
@@ -77,17 +77,17 @@ class TestGitHubCli(TestCase):
                             {'path': '.changelog/foo.md'},
                             {'path': '.changelog/bar.md'},
                         ],
-                        'mergedAt': '2025-07-02T10:42Z',
+                        'mergedAt': '2025-07-02T10:42',
                         'number': '43',
                     },
                     {
                         'files': [{'path': 'other-file.md'}],
-                        'mergedAt': '2025-07-03T10:42Z',
+                        'mergedAt': '2025-07-03T10:42',
                         'number': '44',
                     },
                     {
                         'files': [{'path': 'other-file.txt'}],
-                        'mergedAt': '2025-07-04T10:42Z',
+                        'mergedAt': '2025-07-04T10:42',
                         'number': '45',
                     },
                 ]
