@@ -3,13 +3,14 @@
 #
 
 from argparse import ArgumentParser
-from sys import argv
+from sys import argv as sys_argv
 
 from changelet.command import commands
 from changelet.config import Config
 
 
-def main(argv, exit_on_error=True):
+def main(argv=sys_argv, exit_on_error=True):
+
     parser = ArgumentParser(add_help=True, exit_on_error=exit_on_error)
     parser.add_argument('-c', '--config', help='TODO')
 
@@ -37,4 +38,4 @@ def main(argv, exit_on_error=True):
 
 
 if __name__ == '__main__':  # pragma: no cover
-    main(argv)
+    main()
