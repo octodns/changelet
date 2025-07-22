@@ -18,28 +18,41 @@ class TestGitHubCli(TestCase):
 
     def test_repr(self):
         # smoke
-        GitHubCli(directory='.changelog').__repr__()
+        GitHubCli().__repr__()
 
     def test_pr_by_id(self):
-        gh = GitHubCli(directory='.changelog')
+        gh = GitHubCli()
         # pre-fill the cache
         gh._prs = {42: 'pr'}
-        self.assertEqual('pr', gh.pr_by_id(42))
-        self.assertIsNone(gh.pr_by_id(43))
+        self.assertEqual(
+            'pr', gh.pr_by_id(root='', directory='.changelog', id=42)
+        )
+        self.assertIsNone(gh.pr_by_id(root='', directory='.changelog', id=43))
 
     def test_pr_by_filename(self):
-        gh = GitHubCli(directory='.changelog')
+        gh = GitHubCli()
         # pre-fill the cache
         gh._prs = {'.changelog/abc123.md': 'pr'}
-        self.assertEqual('pr', gh.pr_by_filename('.changelog/abc123.md'))
-        self.assertIsNone(gh.pr_by_filename('.changelog/unknown.md'))
+        self.assertEqual(
+            'pr',
+            gh.pr_by_filename(
+                root='', directory='.changelog', filename='.changelog/abc123.md'
+            ),
+        )
+        self.assertIsNone(
+            gh.pr_by_filename(
+                root='',
+                directory='.changelog',
+                filename='.changelog/unknown.md',
+            )
+        )
 
     @patch('changelet.github.run')
     def test_cache_filling_cmd_params_default(self, run_mock):
-        gh = GitHubCli(directory='.changelog')
+        gh = GitHubCli()
 
         run_mock.return_value = self.ResultMock('[]')
-        self.assertEqual({}, gh.prs)
+        self.assertEqual({}, gh.prs(root='', directory='.changelog'))
         run_mock.assert_called_once()
         args = run_mock.call_args[0][0]
         # make sure our repo was not part of the call params
@@ -49,10 +62,10 @@ class TestGitHubCli(TestCase):
 
     @patch('changelet.github.run')
     def test_cache_filling_cmd_params(self, run_mock):
-        gh = GitHubCli(directory='.changelog', max_lookback=75, repo='org/repo')
+        gh = GitHubCli(max_lookback=75, repo='org/repo')
 
         run_mock.return_value = self.ResultMock('[]')
-        self.assertEqual({}, gh.prs)
+        self.assertEqual({}, gh.prs(root='', directory='.changelog'))
         run_mock.assert_called_once()
         args = run_mock.call_args[0][0]
         # make sure our org and repo are part of the call params
@@ -62,7 +75,7 @@ class TestGitHubCli(TestCase):
 
     @patch('changelet.github.run')
     def test_cache_filling_parsing(self, run_mock):
-        gh = GitHubCli(directory='.changelog')
+        gh = GitHubCli()
 
         run_mock.return_value = self.ResultMock(
             dumps(
@@ -93,7 +106,7 @@ class TestGitHubCli(TestCase):
                 ]
             )
         )
-        prs = gh.prs
+        prs = gh.prs(root='', directory='.changelog')
         run_mock.assert_called_once()
         self.assertEqual(
             [
@@ -107,21 +120,24 @@ class TestGitHubCli(TestCase):
         )
 
         # make sure a second call uses the cache
-        pr = gh.prs['43']
+        pr = gh.prs(root='', directory='.changelog')['43']
         self.assertEqual('43', pr.id)
         run_mock.assert_called_once()
 
     @patch('changelet.github.isdir')
     @patch('changelet.github.run')
     def test_changelog_entries_in_branch(self, run_mock, isdir_mock):
+        gh = GitHubCli()
+
         directory = '.foobar'
-        gh = GitHubCli(directory=directory)
 
         # no directory
         isdir_mock.reset_mock()
         run_mock.reset_mock()
         isdir_mock.return_value = False
-        self.assertEqual(set(), gh.changelog_entries_in_branch())
+        self.assertEqual(
+            set(), gh.changelog_entries_in_branch(root='', directory=directory)
+        )
         isdir_mock.assert_called_once_with(directory)
         run_mock.assert_not_called()
 
@@ -132,7 +148,9 @@ class TestGitHubCli(TestCase):
         isdir_mock.reset_mock()
         run_mock.reset_mock()
         run_mock.return_value = self.ResultMock(b'')
-        self.assertEqual(set(), gh.changelog_entries_in_branch())
+        self.assertEqual(
+            set(), gh.changelog_entries_in_branch(root='', directory=directory)
+        )
         isdir_mock.assert_called_once_with(directory)
         run_mock.assert_called_once()
         # custom directory was used in command
@@ -142,7 +160,9 @@ class TestGitHubCli(TestCase):
         # non changelog changes
         run_mock.reset_mock()
         run_mock.return_value = self.ResultMock(b'foo/bar.py')
-        self.assertEqual(set(), gh.changelog_entries_in_branch())
+        self.assertEqual(
+            set(), gh.changelog_entries_in_branch(root='', directory=directory)
+        )
         run_mock.assert_called_once()
 
         # changelog changes
@@ -150,17 +170,19 @@ class TestGitHubCli(TestCase):
         run_mock.return_value = self.ResultMock(
             b'foo/bar.py\n.foobar/blip.md\nother.txt'
         )
-        self.assertEqual({'.foobar/blip.md'}, gh.changelog_entries_in_branch())
+        self.assertEqual(
+            {'.foobar/blip.md'},
+            gh.changelog_entries_in_branch(root='', directory=directory),
+        )
         run_mock.assert_called_once()
 
     @patch('changelet.github.run')
     def test_add_file(self, run_mock):
-        gh = GitHubCli(directory='baz')
+        gh = GitHubCli()
         filename = 'foo.bar'
 
         run_mock.reset_mock()
         gh.add_file(filename)
         run_mock.assert_called_once()
         args = run_mock.call_args[0][0]
-        print(args)
         self.assertTrue(filename in args)

@@ -18,7 +18,9 @@ class Check:
         exit(code)
 
     def run(self, args, config):
-        if config.provider.changelog_entries_in_branch():
+        if config.provider.changelog_entries_in_branch(
+            root=config.root, directory=config.directory
+        ):
             return self.exit(0)
 
         print(

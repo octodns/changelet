@@ -23,58 +23,85 @@ else:  # pragma: no cover
 
 
 class Config:
+    DEFAULT_ROOT = ''
 
     @classmethod
-    def build_default(cls, directory=''):
-        directory = join(directory, '.changelog')
-        return Config(
-            directory=directory,
-            provider={'class': 'changelet.github.GitHubCli'},
-        )
+    def build(cls, **kwargs):
+        # create w/defaults
+        config = Config()
 
-    @classmethod
-    def build_pyproject_toml(cls, directory=''):
-        pyproject_toml = join(directory, 'pyproject.toml')
-        if isfile(pyproject_toml):
-            with open(pyproject_toml, 'rb') as fh:
-                config = toml_load(fh).get('tool', {}).get('changelet')
-                if config:
-                    return Config(**config)
+        root = kwargs.get('root', cls.DEFAULT_ROOT)
 
-    @classmethod
-    def build_changelet_yaml(cls, directory=''):
-        changelet_yaml = join(directory, '.changelet.yaml')
-        if isfile(changelet_yaml):
-            with open(changelet_yaml, 'rb') as fh:
-                config = yaml_load(fh)
-                if config:
-                    return Config(**config)
+        # override w/toml, if applicable
+        pyproject_toml_filename = join(root, 'pyproject.toml')
+        if isfile(pyproject_toml_filename):
+            config.load_pyproject_toml(pyproject_toml_filename)
 
-    @classmethod
-    def build(cls, config=None, directory=''):
-        return (
-            cls.build_changelet_yaml(directory=directory)
-            or cls.build_pyproject_toml(directory=directory)
-            or cls.build_default(directory=directory)
-        )
+        # explicit yaml file
+        yaml_filename = kwargs.get('config')
+        if not yaml_filename:
+            # default yaml file
+            yaml_filename = join(root, '.changelet.yaml')
+        # override w/yaml, if applicable
+        if isfile(yaml_filename):
+            config.load_yaml(yaml_filename)
 
-    def __init__(self, directory, provider):
+        # override root w/command line arg, if applicable
+        try:
+            config.root = kwargs['root']
+        except KeyError:
+            pass
+
+        # override directory w/command line arg, if applicable
+        try:
+            config.directory = kwargs['directory']
+        except KeyError:
+            pass
+
+        return config
+
+    def __init__(
+        self,
+        root=DEFAULT_ROOT,
+        directory='.changelog',
+        provider={'class': 'changelet.github.GitHubCli'},
+    ):
+        self.root = root
         self.directory = directory
 
-        self._provider_config = provider
-        self._provider = None
+        # will instantiate & configure
+        self.provider = provider
 
     @property
     def provider(self):
-        if self._provider is None:
-            config = self._provider_config
-            klass = config.pop('class')
+        if self._provider_config is not None:
+            value = dict(self._provider_config)
+            klass = value.pop('class')
             if isinstance(klass, str):
                 module, klass = klass.rsplit('.', 1)
                 module = import_module(module)
                 klass = getattr(module, klass)
-            self._provider = klass(directory=self.directory, **config)
+            self._provider = klass(**value)
+            self._provider_config = None
         return self._provider
 
+    @provider.setter
+    def provider(self, value):
+        self._provider_config = value
+
+    def load_pyproject_toml(self, filename):
+        with open(filename, 'rb') as fh:
+            config = toml_load(fh).get('tool', {}).get('changelet')
+            if isinstance(config, dict):
+                for k, v in config.items():
+                    setattr(self, k, v)
+
+    def load_yaml(self, filename=None):
+        with open(filename, 'rb') as fh:
+            config = yaml_load(fh)
+            if isinstance(config, dict):
+                for k, v in config.items():
+                    setattr(self, k, v)
+
     def __repr__(self):
-        return f'Config<directory={self.directory}, provider={self.provider}>'
+        return f'Config<root={self.root}, directory={self.directory}, provider={self.provider}>'

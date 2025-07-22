@@ -14,19 +14,17 @@ from .pr import Pr
 
 class GitHubCli:
 
-    def __init__(self, directory, repo=None, max_lookback=50):
+    def __init__(self, repo=None, max_lookback=50):
         self.log = getLogger('GitHubCli[{repo}]')
-        self.log.info(
-            '__init__: directory=%s, max_lookback=%d', directory, max_lookback
-        )
+        self.log.info('__init__: repo=%s, max_lookback=%d', repo, max_lookback)
         self.repo = repo
-        self.directory = directory
         self.max_lookback = max_lookback
 
         self._prs = None
 
-    @property
-    def prs(self):
+    def prs(self, root, directory):
+        # we're making an assumption here that we'll always be called with the
+        # same root & directory so we can use them once and cache the results.
         if self._prs is None:
             # will be indexed by both id & filename
             prs = {}
@@ -55,7 +53,7 @@ class GitHubCli:
                 files = [
                     f['path']
                     for f in pr['files']
-                    if f['path'].startswith(self.directory)
+                    if f['path'].startswith(directory)
                 ]
                 if not files:
                     # no changelog entries, ignore it
@@ -71,18 +69,18 @@ class GitHubCli:
 
         return self._prs
 
-    def pr_by_id(self, id):
-        return self.prs.get(id)
+    def pr_by_id(self, root, directory, id):
+        return self.prs(root=root, directory=directory).get(id)
 
-    def pr_by_filename(self, filename):
-        return self.prs.get(filename)
+    def pr_by_filename(self, root, directory, filename):
+        return self.prs(root=root, directory=directory).get(filename)
 
-    def changelog_entries_in_branch(self):
+    def changelog_entries_in_branch(self, root, directory):
         # TODO: automatically figure our main branch or configure it
-        if not isdir(self.directory):
+        if not isdir(directory):
             return set()
         result = run(
-            ['git', 'diff', '--name-only', 'origin/main', self.directory],
+            ['git', 'diff', '--name-only', 'origin/main', directory],
             check=False,
             stdout=PIPE,
         )
@@ -96,4 +94,4 @@ class GitHubCli:
         run(['git', 'add', filename], check=True)
 
     def __repr__(self):
-        return f'GitHubCli<directory={self.directory}, repo={self.repo}, max_lookback={self.max_lookback}>'
+        return f'GitHubCli<repo={self.repo}, max_lookback={self.max_lookback}>'

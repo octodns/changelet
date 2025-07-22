@@ -25,5 +25,5 @@ wheel_file=$(ls dist/*$VERSION*.whl)
 pip install "${wheel_file}[test]"
 pytest --disable-network
 echo "## validate command line tool can be run after install #########################"
-changelet create -t none 'This is a test'
+changelet --directory $TMP_DIR create -t none 'This is a test'
 echo "## complete ####################################################################"
