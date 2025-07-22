@@ -69,9 +69,7 @@ class Entry:
         if filename is None:
             filename = self.filename
         directory = dirname(filename)
-        print(f'directory={directory}')
         if not isdir(directory):
-            print('making')
             makedirs(directory)
         with open(filename, 'w') as fh:
             fh.write('---\ntype: ')

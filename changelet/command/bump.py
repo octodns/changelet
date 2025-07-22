@@ -107,7 +107,6 @@ class Bump:
             self.exit(0)
         else:
             changelog = join(root, 'CHANGELOG.md')
-            print(f'changelog={changelog}')
             with open(changelog) as fh:
                 existing = fh.read()
 
