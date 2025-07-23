@@ -30,7 +30,7 @@ tests_require = (
 setup(
     author='Ross McFarland',
     author_email='rwmcfa1@gmail.com',
-    entry_points={'console_scripts': ('changelet = changelet.cmds:main',)},
+    entry_points={'console_scripts': ('changelet = changelet.main:main',)},
     description=description,
     extras_require={
         'dev': tests_require
