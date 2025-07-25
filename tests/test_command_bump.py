@@ -40,7 +40,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
             actions['make_changes'], flags=['--make-changes'], default=False
         )
         self.assert_action(
-            actions['title'], flags=[], nargs='+', default=None, required=True
+            actions['title'], flags=[], nargs='*', default=None, required=False
         )
 
     @patch('changelet.command.bump.exit')
@@ -188,8 +188,10 @@ Patch:
 
             config = Config(join(td.dirname, '.cl'), provider=None)
 
+            # no title
+            expected = expected.replace(' - This is the title', '')
             new_version, buf = cmd.run(
-                self.MockArgs(title, make_changes=True),
+                self.MockArgs([], make_changes=True),
                 config=config,
                 root=td.dirname,
             )
