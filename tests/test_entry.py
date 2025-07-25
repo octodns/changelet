@@ -17,14 +17,14 @@ from changelet.pr import Pr
 
 class DummyProvider:
 
-    def pr_by_id(self, id, merged_at=None):
+    def pr_by_id(self, root, directory, id, merged_at=None):
         text = '#{id}'
         url = f'https://github.com/octodns/changelet/pull/{id}'
         merged_at = merged_at or datetime(2025, 7, 1, 1, 2, 3)
         return Pr(id=id, text=text, url=url, merged_at=merged_at)
 
-    def pr_by_filename(self, filename):
-        return self.pr_by_id(filename)
+    def pr_by_filename(self, root, directory, filename):
+        return self.pr_by_id(root=root, directory=directory, id=filename)
 
 
 class TestEntry(TestCase):
@@ -53,7 +53,7 @@ class TestEntry(TestCase):
 
     def test_save_and_load(self):
         provider = DummyProvider()
-        pr = provider.pr_by_id(43)
+        pr = provider.pr_by_id(root='', directory='', id=43)
 
         # if it doesn't have a filename remove is a noop
         entry = Entry(type='minor', description='ephemeral')
@@ -148,7 +148,7 @@ class TestEntry(TestCase):
             ):
                 description = f'Change {i:04d}'
                 filename = join(config.directory, f'change-{i:04d}.md')
-                pr = provider.pr_by_id(i)
+                pr = provider.pr_by_id(root='', directory='', id=i)
                 entry = Entry(
                     type=type, description=description, pr=pr, filename=filename
                 )
@@ -169,7 +169,7 @@ class TestEntry(TestCase):
         self.assertEqual(f'* {description}', entry.text)
 
         provider = DummyProvider()
-        pr = provider.pr_by_id(43)
+        pr = provider.pr_by_id(root='', directory='', id=43)
         entry = Entry(
             type=type, description=description, pr=pr, filename=filename
         )
@@ -183,7 +183,7 @@ class TestEntry(TestCase):
         self.assertEqual(f'* {description}', entry.markdown)
 
         provider = DummyProvider()
-        pr = provider.pr_by_id(43)
+        pr = provider.pr_by_id(root='', directory='', id=43)
         entry = Entry(
             type=type, description=description, pr=pr, filename=filename
         )
@@ -203,7 +203,9 @@ class TestEntry(TestCase):
         ):
             description = f'Change {i:04d}'
             filename = join(config.directory, f'change-{i:04d}.md')
-            pr = provider.pr_by_id(id=i, merged_at=now - timedelta(days=i))
+            pr = provider.pr_by_id(
+                root='', directory='', id=i, merged_at=now - timedelta(days=i)
+            )
             entry = Entry(
                 type=type, description=description, pr=pr, filename=filename
             )

@@ -58,7 +58,7 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             description = 'Hello World'
             args = ArgsMock(type=type, description=description.split(' '))
             directory = join(td.dirname, '.cl')
-            config = Config(directory, provider=None)
+            config = Config(directory=directory, provider=None)
             config._provider = provider_mock = MagicMock()
             create = Create()
 
