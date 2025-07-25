@@ -30,9 +30,15 @@ class Entry:
             if description[-1] == '\n':
                 description = description[:-1]
             if 'pr' in data:
-                pr = config.provider.pr_by_id(data['pr'])
+                pr = config.provider.pr_by_id(
+                    root=config.root, directory=config.directory, id=data['pr']
+                )
             else:
-                pr = config.provider.pr_by_filename(filename)
+                pr = config.provider.pr_by_filename(
+                    root=config.root,
+                    directory=config.directory,
+                    filename=filename,
+                )
             return Entry(
                 filename=filename,
                 type=data['type'],
