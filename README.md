@@ -34,7 +34,7 @@ The options for type are
 
 Currently the tooling has only been tested with repositories in the octoDNS org, but it should be usable elsewhere. You'll want to have a look at the following for how to incorporate it into your repo and workflows.
 
-* [script/changelog](script/changelog)
+* [(octodns) script/changelog](https://github.com/octodns/octodns/blob/main/script/changelog)
 * [.git_hooks_pre-commit](.git_hooks_pre-commit) (and [script/bootstrap](script/bootstrap) which installs it)
 * [.github/workflows/changelog.yml](.github/workflows/changelog.yml)
 
