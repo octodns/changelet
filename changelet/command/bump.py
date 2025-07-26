@@ -33,6 +33,10 @@ def _get_new_version(current_version, entries):
     return None
 
 
+def version(value):
+    return Version.parse(value)
+
+
 class Bump:
     name = 'bump'
     description = (
@@ -40,6 +44,12 @@ class Bump:
     )
 
     def configure(self, parser):
+        parser.add_argument(
+            '--version',
+            type=version,
+            required=False,
+            help='Use the supplied version number for the bump',
+        )
         parser.add_argument(
             '--make-changes',
             action='store_true',
@@ -62,7 +72,11 @@ class Bump:
 
         entries = sorted(Entry.load_all(config), reverse=True)
 
-        new_version = _get_new_version(current_version, entries)
+        new_version = (
+            args.version
+            if args.version
+            else _get_new_version(current_version, entries)
+        )
         if not new_version:
             print('No changelog entries found that would bump, nothing to do')
             return self.exit(1)

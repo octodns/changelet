@@ -13,7 +13,12 @@ from unittest.mock import call, patch
 from helpers import AssertActionMixin, TemporaryDirectory
 from semver import Version
 
-from changelet.command.bump import Bump, _get_current_version, _get_new_version
+from changelet.command.bump import (
+    Bump,
+    _get_current_version,
+    _get_new_version,
+    version,
+)
 from changelet.config import Config
 from changelet.entry import Entry
 from changelet.pr import Pr
@@ -22,9 +27,10 @@ from changelet.pr import Pr
 class TestCommandBump(TestCase, AssertActionMixin):
 
     class MockArgs:
-        def __init__(self, title, make_changes=False):
+        def __init__(self, title, version=None, make_changes=False):
             self.title = title
             self.make_changes = make_changes
+            self.version = version
 
     def test_configure(self):
         create = Bump()
@@ -194,12 +200,14 @@ Patch:
 
             # no title
             expected = expected.replace(' - This is the title', '')
+            # manual version
+            expected = expected.replace('1.0.0', '3.0.0')
             new_version, buf = cmd.run(
-                self.MockArgs([], make_changes=True),
+                self.MockArgs([], version=Version(3), make_changes=True),
                 config=config,
                 root=td.dirname,
             )
-            self.assertEqual('1.0.0', new_version)
+            self.assertEqual('3.0.0', new_version)
             self.assertEqual(expected, buf)
             # all the changelog md files were removed
             rm_mock.assert_has_calls(
@@ -213,7 +221,7 @@ Patch:
                 self.assertEqual(f'{expected}fin', fh.read())
             # init had version updated
             with open(init) as fh:
-                self.assertEqual("# __version__ = '1.0.0' #", fh.read())
+                self.assertEqual("# __version__ = '3.0.0' #", fh.read())
 
 
 class TestGetNewVersion(TestCase):
@@ -279,3 +287,13 @@ class TestGetCurrentVersion(TestCase):
             self.assertEqual(3, ver.major)
             self.assertEqual(2, ver.minor)
             self.assertEqual(1, ver.patch)
+
+
+class TestVersion(TestCase):
+
+    def test_smoke(self):
+        # this is bascially semver.Version.parse so we'll leave the actual
+        # testing to it, here we'll just make sure things are plumbed up
+        self.assertEqual(Version(1, 22, 33), version('1.22.33'))
+        with self.assertRaises(ValueError):
+            version('1.foo.33')
