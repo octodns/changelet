@@ -10,6 +10,14 @@ from changelet.pr import Pr
 
 class TestPr(TestCase):
 
+    def test_repr(self):
+        # smoke
+        id = 42
+        text = '#{id}'
+        url = f'https://github.com/octodns/changelet/pull/{id}'
+        merged_at = datetime(2025, 7, 1, 1, 2, 3)
+        Pr(id=id, text=text, url=url, merged_at=merged_at).__repr__()
+
     def test_pr(self):
         id = 42
         text = '#{id}'

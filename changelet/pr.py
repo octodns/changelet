@@ -18,3 +18,6 @@ class Pr:
     @property
     def markdown(self):
         return f'[{self.text}]({self.url})'
+
+    def __repr__(self):
+        return f'Pr<{self.id}, {self.merged_at}>'

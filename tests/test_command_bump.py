@@ -3,7 +3,7 @@
 #
 
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from os import makedirs
 from os.path import basename, join
 from sys import version_info
@@ -85,7 +85,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
         cmd = Bump()
 
         gcv_mock.return_value = Version.parse('0.1.3')
-        now = datetime.now()
+        now = datetime.now().replace(tzinfo=timezone.utc)
         ela_mock.return_value = [
             Entry(
                 type='none',
