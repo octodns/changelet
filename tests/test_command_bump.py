@@ -11,13 +11,9 @@ from unittest import TestCase
 from unittest.mock import call, patch
 
 from helpers import AssertActionMixin, TemporaryDirectory
+from semver import Version
 
-from changelet.command.bump import (
-    Bump,
-    _format_version,
-    _get_current_version,
-    _get_new_version,
-)
+from changelet.command.bump import Bump, _get_current_version, _get_new_version
 from changelet.config import Config
 from changelet.entry import Entry
 from changelet.pr import Pr
@@ -66,7 +62,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
         directory = '.cl'
         config = Config(directory, provider=None)
 
-        gcv_mock.return_value = (0, 1, 3)
+        gcv_mock.return_value = Version.parse('0.1.3')
         title = 'This is the title'.split(' ')
 
         # no changes
@@ -88,7 +84,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
     def test_run(self, rm_mock, gcv_mock, ela_mock, exit_mock):
         cmd = Bump()
 
-        gcv_mock.return_value = (0, 1, 3)
+        gcv_mock.return_value = Version.parse('0.1.3')
         now = datetime.now()
         ela_mock.return_value = [
             Entry(
@@ -220,48 +216,49 @@ Patch:
                 self.assertEqual("# __version__ = '1.0.0' #", fh.read())
 
 
-class TestFormatVersion(TestCase):
-
-    def test_format(self):
-        self.assertEqual('1.2.3', _format_version((1, 2, 3)))
-        self.assertEqual('1.2.3', _format_version(('1', '2', '3')))
-
-
 class TestGetNewVersion(TestCase):
 
     def test_get_new_version(self):
         # no changelogs, get nothing back/no bump
-        self.assertIsNone(_get_new_version((1, 2, 3), []))
+        self.assertIsNone(_get_new_version(Version(1, 2, 3), []))
 
         # none doesn't bump
         self.assertIsNone(
-            _get_new_version((1, 2, 3), [Entry(type='none', description='')])
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='none', description='')]
+            )
         )
 
         # patch bump
         self.assertEqual(
-            (1, 2, 4),
-            _get_new_version((1, 2, 3), [Entry(type='patch', description='')]),
+            Version(1, 2, 4),
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='patch', description='')]
+            ),
         )
 
         # minor bump
         self.assertEqual(
-            (1, 3, 0),
-            _get_new_version((1, 2, 3), [Entry(type='minor', description='')]),
+            Version(1, 3, 0),
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='minor', description='')]
+            ),
         )
 
         # major bump
         self.assertEqual(
-            (2, 0, 0),
-            _get_new_version((1, 2, 3), [Entry(type='major', description='')]),
+            Version(2, 0, 0),
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='major', description='')]
+            ),
         )
 
         # assume the first one is the driving type, ecpect ordered changlogs
         # entries, don't touch them ourselves
         self.assertEqual(
-            (1, 3, 0),
+            Version(1, 3, 0),
             _get_new_version(
-                (1, 2, 3),
+                Version(1, 2, 3),
                 [
                     Entry(type='minor', description=''),
                     Entry(type='major', description=''),
@@ -279,4 +276,6 @@ class TestGetCurrentVersion(TestCase):
                 fh.write('__version__ = "3.2.1"')
 
             ver = _get_current_version(module_name, directory=td.dirname)
-            self.assertEqual((3, 2, 1), ver)
+            self.assertEqual(3, ver.major)
+            self.assertEqual(2, ver.minor)
+            self.assertEqual(1, ver.patch)

@@ -8,14 +8,15 @@ from io import StringIO
 from os.path import abspath, basename, join
 from sys import exit, path
 
+from semver import Version
+
 from changelet.entry import Entry
 
 
 def _get_current_version(module_name, directory='.'):
     path.append(directory)
     module = import_module(module_name)
-    # TODO: make sure this requires 3-part semantic version
-    return tuple(int(v) for v in module.__version__.split('.', 2))
+    return Version.parse(module.__version__)
 
 
 def _get_new_version(current_version, entries):
@@ -23,23 +24,13 @@ def _get_new_version(current_version, entries):
         bump_type = entries[0].type
     except IndexError:
         return None
-    new_version = list(current_version)
     if bump_type == 'major':
-        new_version[0] += 1
-        new_version[1] = 0
-        new_version[2] = 0
+        return current_version.bump_major()
     elif bump_type == 'minor':
-        new_version[1] += 1
-        new_version[2] = 0
+        return current_version.bump_minor()
     elif bump_type == 'patch':
-        new_version[2] += 1
-    else:
-        return None
-    return tuple(new_version)
-
-
-def _format_version(version):
-    return '.'.join(str(v) for v in version)
+        return current_version.bump_patch()
+    return None
 
 
 class Bump:
@@ -75,8 +66,7 @@ class Bump:
         if not new_version:
             print('No changelog entries found that would bump, nothing to do')
             return self.exit(1)
-        new_version = _format_version(new_version)
-        buf.write(new_version)
+        buf.write(str(new_version))
         buf.write(' - ')
         buf.write(datetime.now().strftime('%Y-%m-%d'))
         if args.title:
@@ -119,9 +109,10 @@ class Bump:
             with open(init) as fh:
                 existing = fh.read()
 
-            current_version = _format_version(current_version)
             with open(init, 'w') as fh:
-                fh.write(existing.replace(current_version, new_version))
+                fh.write(
+                    existing.replace(str(current_version), str(new_version))
+                )
 
             for entry in entries:
                 entry.remove()
