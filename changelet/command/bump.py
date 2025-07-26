@@ -55,7 +55,7 @@ class Bump:
             help='Write changelog update and bump version number',
         )
         parser.add_argument(
-            'title', nargs='+', help='A short title/quip for the release title'
+            'title', nargs='*', help='A short title/quip for the release title'
         )
 
     def exit(self, code):
@@ -79,8 +79,9 @@ class Bump:
         buf.write(new_version)
         buf.write(' - ')
         buf.write(datetime.now().strftime('%Y-%m-%d'))
-        buf.write(' - ')
-        buf.write(' '.join(args.title))
+        if args.title:
+            buf.write(' - ')
+            buf.write(' '.join(args.title))
         buf.write('\n')
 
         current_type = None
