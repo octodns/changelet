@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from os import makedirs
 from os.path import basename, join
+from sys import version_info
 from unittest import TestCase
 from unittest.mock import call, patch
 
@@ -39,8 +40,15 @@ class TestCommandBump(TestCase, AssertActionMixin):
         self.assert_action(
             actions['make_changes'], flags=['--make-changes'], default=False
         )
+        # 3.12 made a change to * so that required=False, before that it was
+        # True, for now we'll have to ignore it
+        required = False if version_info >= (3, 12, 0) else None
         self.assert_action(
-            actions['title'], flags=[], nargs='*', default=None, required=False
+            actions['title'],
+            flags=[],
+            nargs='*',
+            default=None,
+            required=required,
         )
 
     @patch('changelet.command.bump.exit')

@@ -29,5 +29,6 @@ class AssertActionMixin:
         self.assertEqual(default, action.default)
         if choices is not None:
             self.assertEqual(choices, set(action.choices))
-        self.assertEqual(required, action.required)
+        if required is not None:
+            self.assertEqual(required, action.required)
         self.assertTrue(action.help)
