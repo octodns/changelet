@@ -29,6 +29,10 @@ class DummyProvider:
 
 class TestEntry(TestCase):
 
+    def test_repr(self):
+        # smoke
+        Entry(type='none', description='', pr=None, filename='').__repr__()
+
     def test_properties(self):
         entry = Entry(type='none', description='', pr=None, filename='')
         # no pr means epoch, none=0

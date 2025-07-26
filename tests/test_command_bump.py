@@ -3,7 +3,7 @@
 #
 
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from os import makedirs
 from os.path import basename, join
 from sys import version_info
@@ -11,12 +11,13 @@ from unittest import TestCase
 from unittest.mock import call, patch
 
 from helpers import AssertActionMixin, TemporaryDirectory
+from semver import Version
 
 from changelet.command.bump import (
     Bump,
-    _format_version,
     _get_current_version,
     _get_new_version,
+    version,
 )
 from changelet.config import Config
 from changelet.entry import Entry
@@ -26,9 +27,10 @@ from changelet.pr import Pr
 class TestCommandBump(TestCase, AssertActionMixin):
 
     class MockArgs:
-        def __init__(self, title, make_changes=False):
+        def __init__(self, title, version=None, make_changes=False):
             self.title = title
             self.make_changes = make_changes
+            self.version = version
 
     def test_configure(self):
         create = Bump()
@@ -66,7 +68,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
         directory = '.cl'
         config = Config(directory, provider=None)
 
-        gcv_mock.return_value = (0, 1, 3)
+        gcv_mock.return_value = Version.parse('0.1.3')
         title = 'This is the title'.split(' ')
 
         # no changes
@@ -88,8 +90,8 @@ class TestCommandBump(TestCase, AssertActionMixin):
     def test_run(self, rm_mock, gcv_mock, ela_mock, exit_mock):
         cmd = Bump()
 
-        gcv_mock.return_value = (0, 1, 3)
-        now = datetime.now()
+        gcv_mock.return_value = Version.parse('0.1.3')
+        now = datetime.now().replace(tzinfo=timezone.utc)
         ela_mock.return_value = [
             Entry(
                 type='none',
@@ -198,12 +200,14 @@ Patch:
 
             # no title
             expected = expected.replace(' - This is the title', '')
+            # manual version
+            expected = expected.replace('1.0.0', '3.0.0')
             new_version, buf = cmd.run(
-                self.MockArgs([], make_changes=True),
+                self.MockArgs([], version=Version(3), make_changes=True),
                 config=config,
                 root=td.dirname,
             )
-            self.assertEqual('1.0.0', new_version)
+            self.assertEqual('3.0.0', new_version)
             self.assertEqual(expected, buf)
             # all the changelog md files were removed
             rm_mock.assert_has_calls(
@@ -217,51 +221,52 @@ Patch:
                 self.assertEqual(f'{expected}fin', fh.read())
             # init had version updated
             with open(init) as fh:
-                self.assertEqual("# __version__ = '1.0.0' #", fh.read())
-
-
-class TestFormatVersion(TestCase):
-
-    def test_format(self):
-        self.assertEqual('1.2.3', _format_version((1, 2, 3)))
-        self.assertEqual('1.2.3', _format_version(('1', '2', '3')))
+                self.assertEqual("# __version__ = '3.0.0' #", fh.read())
 
 
 class TestGetNewVersion(TestCase):
 
     def test_get_new_version(self):
         # no changelogs, get nothing back/no bump
-        self.assertIsNone(_get_new_version((1, 2, 3), []))
+        self.assertIsNone(_get_new_version(Version(1, 2, 3), []))
 
         # none doesn't bump
         self.assertIsNone(
-            _get_new_version((1, 2, 3), [Entry(type='none', description='')])
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='none', description='')]
+            )
         )
 
         # patch bump
         self.assertEqual(
-            (1, 2, 4),
-            _get_new_version((1, 2, 3), [Entry(type='patch', description='')]),
+            Version(1, 2, 4),
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='patch', description='')]
+            ),
         )
 
         # minor bump
         self.assertEqual(
-            (1, 3, 0),
-            _get_new_version((1, 2, 3), [Entry(type='minor', description='')]),
+            Version(1, 3, 0),
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='minor', description='')]
+            ),
         )
 
         # major bump
         self.assertEqual(
-            (2, 0, 0),
-            _get_new_version((1, 2, 3), [Entry(type='major', description='')]),
+            Version(2, 0, 0),
+            _get_new_version(
+                Version(1, 2, 3), [Entry(type='major', description='')]
+            ),
         )
 
         # assume the first one is the driving type, ecpect ordered changlogs
         # entries, don't touch them ourselves
         self.assertEqual(
-            (1, 3, 0),
+            Version(1, 3, 0),
             _get_new_version(
-                (1, 2, 3),
+                Version(1, 2, 3),
                 [
                     Entry(type='minor', description=''),
                     Entry(type='major', description=''),
@@ -279,4 +284,16 @@ class TestGetCurrentVersion(TestCase):
                 fh.write('__version__ = "3.2.1"')
 
             ver = _get_current_version(module_name, directory=td.dirname)
-            self.assertEqual((3, 2, 1), ver)
+            self.assertEqual(3, ver.major)
+            self.assertEqual(2, ver.minor)
+            self.assertEqual(1, ver.patch)
+
+
+class TestVersion(TestCase):
+
+    def test_smoke(self):
+        # this is bascially semver.Version.parse so we'll leave the actual
+        # testing to it, here we'll just make sure things are plumbed up
+        self.assertEqual(Version(1, 22, 33), version('1.22.33'))
+        with self.assertRaises(ValueError):
+            version('1.foo.33')

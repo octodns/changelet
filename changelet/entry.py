@@ -2,7 +2,7 @@
 #
 #
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from os import listdir, makedirs, remove
 from os.path import dirname, isdir, join
@@ -18,7 +18,7 @@ class EntryType(Enum):
 
 
 class Entry:
-    EPOCH = datetime(1970, 1, 1)
+    EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
     ORDERING = {'major': 3, 'minor': 2, 'patch': 1, 'none': 0, '': 0}
 
     @classmethod
@@ -115,3 +115,6 @@ class Entry:
 
     def __lt__(self, other):
         return self._ordering < other._ordering
+
+    def __repr__(self):
+        return f'Entry<{self.type}, {self.description[:16]}, {self.filename}, {self.pr}>'

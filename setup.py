@@ -48,7 +48,7 @@ setup(
         ),
         'test': tests_require,
     },
-    install_requires=('PyYaml',),
+    install_requires=('PyYaml', 'semver>=3.0.0'),
     license='MIT',
     long_description=long_description,
     long_description_content_type='text/markdown',
