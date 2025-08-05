@@ -12,7 +12,13 @@ class Check:
     )
 
     def configure(self, parser):
-        pass
+        parser.add_argument(
+            '-q',
+            '--quiet',
+            action='store_true',
+            default=False,
+            help='Do not print status message to stdout',
+        )
 
     def exit(self, code):
         exit(code)
@@ -23,8 +29,9 @@ class Check:
         ):
             return self.exit(0)
 
-        print(
-            f'PR is missing required changelog file, run {argv[0]} create',
-            file=stderr,
-        )
+        if not args.quiet:
+            print(
+                f'PR is missing required changelog file, run {argv[0]} create',
+                file=stderr,
+            )
         self.exit(1)
