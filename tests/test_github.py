@@ -174,3 +174,14 @@ class TestGitHubCli(TestCase):
         run_mock.assert_called_once()
         args = run_mock.call_args[0][0]
         self.assertTrue(filename in args)
+
+    @patch('changelet.github.run')
+    def test_commit(self, run_mock):
+        gh = GitHubCli()
+        description = 'Hello World'
+
+        run_mock.reset_mock()
+        gh.commit(description)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertTrue(description in args)
