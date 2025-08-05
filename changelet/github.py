@@ -90,5 +90,8 @@ class GitHubCli:
     def add_file(self, filename):
         run(['git', 'add', filename], check=True)
 
+    def commit(self, description):
+        run(['git', 'commit', '-m', description], check=True)
+
     def __repr__(self):
         return f'GitHubCli<repo={self.repo}, max_lookback={self.max_lookback}>'

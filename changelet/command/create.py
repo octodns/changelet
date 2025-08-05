@@ -43,6 +43,13 @@ See https://semver.org/ for more info''',
             help='`git add` the newly created changelog entry',
         )
         parser.add_argument(
+            '-c',
+            '--commit',
+            action='store_true',
+            default=False,
+            help='`git commit` add the entry and commit staged changes using the same description',
+        )
+        parser.add_argument(
             'description',
             metavar='change-description',
             nargs='+',
@@ -53,19 +60,26 @@ and links.''',
 
     def run(self, args, config):
         filename = join(config.directory, f'{uuid4().hex}.md')
+        description = ' '.join(args.description)
         entry = Entry(
             type=args.type,
-            description=' '.join(args.description),
+            description=description,
             pr=args.pr,
             filename=filename,
         )
         entry.save()
 
-        if args.add:
+        if args.add or args.commit:
             config.provider.add_file(entry.filename)
-            print(
-                f'Created {entry.filename}, it has been staged and should be committed to your branch.'
-            )
+            if args.commit:
+                config.provider.commit(description)
+                print(
+                    f'Created {entry.filename}, it has been committed along with staged changes.'
+                )
+            else:
+                print(
+                    f'Created {entry.filename}, it has been staged and should be committed to your branch.'
+                )
         else:
             print(
                 f'Created {entry.filename}, it can be further edited and should be committed to your branch.'

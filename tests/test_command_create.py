@@ -47,11 +47,14 @@ class TestCommandCreate(TestCase, AssertActionMixin):
 
         class ArgsMock:
 
-            def __init__(self, type, description, pr=None, add=False):
+            def __init__(
+                self, type, description, pr=None, add=False, commit=False
+            ):
                 self.type = type
                 self.description = description
                 self.pr = pr
                 self.add = add
+                self.commit = commit
 
         with TemporaryDirectory() as td:
             type = 'patch'
@@ -90,3 +93,12 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             self.assertNotEqual(filename, new_filename)
             save_mock.assert_called_once()
             provider_mock.add_file.assert_called_once_with(new_filename)
+
+            # commit
+            provider_mock.reset_mock()
+            args.add = False
+            args.commit = True
+            entry = create.run(args, config)
+            new_filename = entry.filename
+            provider_mock.add_file.assert_called_once_with(new_filename)
+            provider_mock.commit.assert_called_once_with(description)
