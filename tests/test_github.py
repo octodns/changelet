@@ -47,14 +47,16 @@ class TestGitHubCli(TestCase):
             )
         )
 
-    @patch('changelet.github.run')
+    @patch('changelet.github.GitHubCli._run')
     def test_cache_filling_cmd_params_default(self, run_mock):
         gh = GitHubCli()
 
-        run_mock.return_value = self.ResultMock('[]')
+        run_mock.side_effect = [{'nameWithOwner': 'name/with'}, []]
         self.assertEqual({}, gh.prs(root='', directory='.changelog'))
-        run_mock.assert_called_once()
-        args = run_mock.call_args[0][0]
+        calls = run_mock.call_args_list
+        self.assertEqual(2, len(calls))
+        # 2nd call is the one we're interested in
+        args = calls[1].args[0]
         # make sure our repo was not part of the call params
         self.assertFalse('--repo' in args)
         # make sure the default limit is applied
@@ -64,6 +66,7 @@ class TestGitHubCli(TestCase):
     def test_cache_filling_cmd_params(self, run_mock):
         gh = GitHubCli(max_lookback=75, repo='org/repo')
 
+        # we passed a repo to the ctor, so no gh repo view call happens
         run_mock.return_value = self.ResultMock('[]')
         self.assertEqual({}, gh.prs(root='', directory='.changelog'))
         run_mock.assert_called_once()
@@ -77,37 +80,40 @@ class TestGitHubCli(TestCase):
     def test_cache_filling_parsing(self, run_mock):
         gh = GitHubCli()
 
-        run_mock.return_value = self.ResultMock(
-            dumps(
-                [
-                    {
-                        'files': [{'path': '.changelog/abcd1234.md'}],
-                        'mergedAt': '2025-07-01T10:42',
-                        'number': '42',
-                    },
-                    {
-                        'files': [
-                            {'path': '.changelog/foo.md'},
-                            {'path': '.changelog/bar.md'},
-                        ],
-                        'mergedAt': '2025-07-02T10:42',
-                        'number': '43',
-                    },
-                    {
-                        'files': [{'path': 'other-file.md'}],
-                        'mergedAt': '2025-07-03T10:42',
-                        'number': '44',
-                    },
-                    {
-                        'files': [{'path': 'other-file.txt'}],
-                        'mergedAt': '2025-07-04T10:42',
-                        'number': '45',
-                    },
-                ]
-            )
-        )
+        run_mock.side_effect = [
+            self.ResultMock(dumps({'nameWithOwner': 'theorg/darepo'})),
+            self.ResultMock(
+                dumps(
+                    [
+                        {
+                            'files': [{'path': '.changelog/abcd1234.md'}],
+                            'mergedAt': '2025-07-01T10:42',
+                            'number': '42',
+                        },
+                        {
+                            'files': [
+                                {'path': '.changelog/foo.md'},
+                                {'path': '.changelog/bar.md'},
+                            ],
+                            'mergedAt': '2025-07-02T10:42',
+                            'number': '43',
+                        },
+                        {
+                            'files': [{'path': 'other-file.md'}],
+                            'mergedAt': '2025-07-03T10:42',
+                            'number': '44',
+                        },
+                        {
+                            'files': [{'path': 'other-file.txt'}],
+                            'mergedAt': '2025-07-04T10:42',
+                            'number': '45',
+                        },
+                    ]
+                )
+            ),
+        ]
         prs = gh.prs(root='', directory='.changelog')
-        run_mock.assert_called_once()
+        self.assertEqual(2, len(run_mock.call_args))
         self.assertEqual(
             [
                 '.changelog/abcd1234.md',
@@ -118,11 +124,16 @@ class TestGitHubCli(TestCase):
             ],
             sorted(prs.keys()),
         )
+        # make sure the results of the org/repo lookup are used in the URLs
+        self.assertEqual(
+            'https://github.com/theorg/darepo/pull/42', prs['42'].url
+        )
 
         # make sure a second call uses the cache
+        run_mock.reset_mock()
         pr = gh.prs(root='', directory='.changelog')['43']
         self.assertEqual('43', pr.id)
-        run_mock.assert_called_once()
+        run_mock.assert_not_called()
 
     @patch('changelet.github.run')
     def test_changelog_entries_in_branch(self, run_mock):
