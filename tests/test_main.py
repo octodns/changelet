@@ -2,6 +2,7 @@
 #
 #
 
+import logging
 from argparse import ArgumentError
 from sys import version_info
 from unittest import TestCase
@@ -74,3 +75,9 @@ class TestMain(TestCase):
             )
         exit_mock.assert_called_once()
         build_mock.assert_called_once_with(directory='directory-dir')
+
+    @patch('changelet.command.check.exit')
+    def test_arg_logging(self, exit_mock):
+        with patch('logging.basicConfig') as basicConfig_mock:
+            main(['e*e', '--logging', 'INFO', 'check'], exit_on_error=False)
+            basicConfig_mock.assert_called_once_with(level=logging.INFO)

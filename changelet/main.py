@@ -2,6 +2,7 @@
 #
 #
 
+import logging
 from argparse import ArgumentParser
 from sys import argv as sys_argv
 
@@ -26,6 +27,13 @@ def main(argv=sys_argv, exit_on_error=True):
         help='The changelog directory, relative to `root`, Default: .changelog',
         default=None,
     )
+    parser.add_argument(
+        '-l',
+        '--logging',
+        help='Logging level, Default: NONE',
+        default=None,
+        choices=('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'),
+    )
 
     subparsers = parser.add_subparsers(
         dest="command", required=True, help="Available sub-commands"
@@ -37,6 +45,9 @@ def main(argv=sys_argv, exit_on_error=True):
         command.configure(command_parser)
 
     args = parser.parse_args(argv[1:])
+
+    if args.logging is not None:
+        logging.basicConfig(level=getattr(logging, args.logging))
 
     kwargs = {}
     if args.config:
