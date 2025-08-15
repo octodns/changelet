@@ -21,6 +21,10 @@ class GitHubCli:
 
         self._prs = None
 
+    def _run(self, cmd):
+        result = run(cmd, check=True, stdout=PIPE)
+        return loads(result.stdout)
+
     def prs(self, root, directory):
         # we're making an assumption here that we'll always be called with the
         # same root & directory so we can use them once and cache the results.
@@ -40,13 +44,19 @@ class GitHubCli:
                 '--json',
                 'files,mergedAt,number',
             ]
-            if self.repo:
-                cmd.extend(('--repo', f'{self.repo}'))
-            result = run(cmd, check=True, stdout=PIPE)
+            repo = self.repo
+            if repo:
+                cmd.extend(('--repo', f'{repo}'))
 
-            for pr in loads(result.stdout):
+            # we need to know the repo for PR urls
+            if not repo:
+                repo = self._run(
+                    ['gh', 'repo', 'view', '--json', 'nameWithOwner']
+                )['nameWithOwner']
+
+            for pr in self._run(cmd):
                 number = pr['number']
-                url = f'https://github.com/{self.repo}/pull/{number}'
+                url = f'https://github.com/{repo}/pull/{number}'
                 merged_at = datetime.fromisoformat(pr['mergedAt'])
 
                 files = [
