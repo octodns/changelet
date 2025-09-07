@@ -61,12 +61,15 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             description = 'Hello World'
             args = ArgsMock(type=type, description=description.split(' '))
             directory = join(td.dirname, '.cl')
-            config = Config(directory=directory, provider=None)
+            config = Config(
+                directory=directory, commit_prefix='xyz: ', provider=None
+            )
             config._provider = provider_mock = MagicMock()
             create = Create()
 
             # directory doesn't exist, will be created
             save_mock.reset_mock()
+            provider_mock.reset_mock()
             entry = create.run(args, config)
             # args made it through
             self.assertEqual(type, entry.type)
@@ -78,9 +81,11 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             save_mock.assert_called_once()
             # add wasn't called
             provider_mock.add_file.assert_not_called()
+            provider_mock.has_staged.assert_not_called()
 
             # directory exist
             save_mock.reset_mock()
+            provider_mock.reset_mock()
             args.pr = pr = 43
             args.add = True
             entry = create.run(args, config)
@@ -93,12 +98,31 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             self.assertNotEqual(filename, new_filename)
             save_mock.assert_called_once()
             provider_mock.add_file.assert_called_once_with(new_filename)
+            provider_mock.has_staged.assert_not_called()
 
-            # commit
+            # commit w/staged
+            save_mock.reset_mock()
             provider_mock.reset_mock()
+            provider_mock.has_staged.return_value = True
             args.add = False
             args.commit = True
             entry = create.run(args, config)
             new_filename = entry.filename
             provider_mock.add_file.assert_called_once_with(new_filename)
+            provider_mock.has_staged.assert_called_once()
             provider_mock.commit.assert_called_once_with(description)
+            save_mock.assert_called_once()
+
+            # commit w/o staged
+            save_mock.reset_mock()
+            provider_mock.reset_mock()
+            provider_mock.has_staged.return_value = False
+            args.add = False
+            args.commit = True
+            entry = create.run(args, config)
+            new_filename = entry.filename
+            provider_mock.add_file.assert_called_once_with(new_filename)
+            provider_mock.has_staged.assert_called_once()
+            # custom/overridden config_prefix
+            provider_mock.commit.assert_called_once_with(f'xyz: {description}')
+            save_mock.assert_called_once()
