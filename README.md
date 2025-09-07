@@ -30,6 +30,14 @@ The options for type are
 * `patch` - fixes an issue or bug with existing functionality
 * `none` - change that should not be included in the CHANGELOG and will not directly impact users, e.g. documentation, README, tooling, ...
 
+#### Slash Command
+
+There is an optional GitHub slash command action that can installed. If it's installed users with write permissions to the repo can add a comment in the PR to add Changelog entries. The interface is almost idential to the command line, though only the create command is supported at this time.
+
+```console
+/changelog create -t none This is an example changelog entry added as a PR comment
+```
+
 ### Using changlet
 
 Currently the tooling has only been tested with repositories in the octoDNS org, but it should be usable elsewhere. You'll want to have a look at the following for how to incorporate it into your repo and workflows.
