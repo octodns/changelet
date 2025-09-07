@@ -72,6 +72,9 @@ and links.''',
         if args.add or args.commit:
             config.provider.add_file(entry.filename)
             if args.commit:
+                if not config.provider.has_staged():
+                    # if this is going to be a changelog only commit, prefix it
+                    description = f'{config.commit_prefix}{description}'
                 config.provider.commit(description)
                 print(
                     f'Created {entry.filename}, it has been committed along with staged changes.'

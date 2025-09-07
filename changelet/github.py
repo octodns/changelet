@@ -100,6 +100,12 @@ class GitHubCli:
     def add_file(self, filename):
         run(['git', 'add', filename], check=True)
 
+    def has_staged(self):
+        result = run(
+            ['git', 'diff', '--staged'], check=True, capture_output=True
+        )
+        return len(result.stdout) > 0
+
     def commit(self, description):
         run(['git', 'commit', '-m', description], check=True)
 

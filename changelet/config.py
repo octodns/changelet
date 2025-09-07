@@ -64,10 +64,12 @@ class Config:
         self,
         root=DEFAULT_ROOT,
         directory='.changelog',
+        commit_prefix='Changelog: ',
         provider={'class': 'changelet.github.GitHubCli'},
     ):
         self.root = root
         self.directory = directory
+        self.commit_prefix = commit_prefix
 
         # will instantiate & configure
         self.provider = provider

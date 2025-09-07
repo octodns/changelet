@@ -24,6 +24,7 @@ class TestConfig(TestCase):
         config = Config()
         self.assertEqual('', config.root)
         self.assertEqual('.changelog', config.directory)
+        self.assertEqual('Changelog: ', config.commit_prefix)
         self.assertEqual(
             {'class': 'changelet.github.GitHubCli'}, config._provider_config
         )
@@ -34,10 +35,14 @@ class TestConfig(TestCase):
     def test_overrides(self):
         klass = self.DummyProvider
         config = Config(
-            root='.foo', directory='.bar', provider={'class': klass}
+            root='.foo',
+            directory='.bar',
+            commit_prefix='abc: ',
+            provider={'class': klass},
         )
         self.assertEqual('.foo', config.root)
         self.assertEqual('.bar', config.directory)
+        self.assertEqual('abc: ', config.commit_prefix)
         self.assertIsInstance(config.provider, self.DummyProvider)
 
     def test_provider(self):

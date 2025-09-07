@@ -187,6 +187,20 @@ class TestGitHubCli(TestCase):
         self.assertTrue(filename in args)
 
     @patch('changelet.github.run')
+    def test_has_staged(self, run_mock):
+        gh = GitHubCli()
+
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock('')
+        self.assertFalse(gh.has_staged())
+        run_mock.assert_called_once()
+
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock('There is output, thus changes')
+        self.assertTrue(gh.has_staged())
+        run_mock.assert_called_once()
+
+    @patch('changelet.github.run')
     def test_commit(self, run_mock):
         gh = GitHubCli()
         description = 'Hello World'
