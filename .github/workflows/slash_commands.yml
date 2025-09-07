@@ -24,7 +24,7 @@ jobs:
           # The regex 's' modifier allows the dot to match newlines
           # and the 'm' modifier allows '^' to match at the beginning of each line
           # This handles commands spanning multiple lines
-          parsed_body=$(echo "$command_body" | sed -E 's/\/changelog create -t ([a-z]+) (.*)$/\1|\2/s')
+          parsed_body=$(echo "$command_body" | sed -E 's/\/changelog create -t ([a-z]+) (.*)$/\1|\2/')
 
           # The parsed output will be 'type|message'
           changelog_type=$(echo "$parsed_body" | cut -d'|' -f1)
