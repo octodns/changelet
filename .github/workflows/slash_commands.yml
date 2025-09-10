@@ -36,8 +36,10 @@ jobs:
 
       # check out our repo and install our requirements
       - uses: actions/checkout@v4
-      - name: Fetch main
-        run: git fetch origin main --depth 1
+        with:
+          # issue_comment event runs on main, we need to checkout the PR
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
       - name: Setup python
         uses: actions/setup-python@v4
         with:
@@ -49,11 +51,18 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       # add the changelog entry
-      - name: Changelog Check
+      - name: Changelog Create
+        id: changelog
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          ./script/changelog check -c -t "${{ steps.parse_command.outputs.changelog_type }}" "${{ steps.parse_command.outputs.message }}"
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha"
+          # the origin one is where we need to push to, other two aren't useful
+          branch=$(git branch --all --contains $SHA | grep origin | sed 's#^.*origin/##;s/[[:space:]]*$//')
+          echo "branch=$branch"
 
-          git push
+          ./script/changelog create -c -t "${{ steps.parse_command.outputs.changelog_type }}" "${{ steps.parse_command.outputs.message }}"
+
+          git push origin HEAD:"$branch"
