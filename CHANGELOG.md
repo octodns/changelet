@@ -1,3 +1,8 @@
+## 0.3.0 - 2025-09-10
+
+Minor:
+* Add commit prefix for changelog only commits - [#14](https://github.com/octodns/changelet/pull/14)
+
 ## 0.2.0 - 2025-08-15
 
 Minor:
