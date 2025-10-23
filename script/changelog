@@ -1,11 +1,8 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-import os
-import sys
+#!/bin/bash
 
-if __name__ == '__main__':
-    sys.path.append(os.getcwd())
+# Get current script path
+SCRIPT_PATH="$( dirname -- "$( readlink -f -- "${0}"; )"; )"
+# Activate OctoDNS Python venv
+source "${SCRIPT_PATH}/common.sh"
 
-    from changelet.main import main
-
-    sys.exit(main())
+PYTHONPATH=. ./changelet/main.py "$@"
