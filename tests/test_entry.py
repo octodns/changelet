@@ -224,3 +224,20 @@ class TestEntry(TestCase):
             ['none', 'none', 'patch', 'minor', 'minor', 'major'],
             [e.type for e in entries],
         )
+
+    def test_description(self):
+        entry = Entry(type='minor', description='foo')
+        self.assertEqual('foo', entry.description)
+
+        entry = Entry(type='minor', description='foo\n')
+        self.assertEqual('foo', entry.description)
+
+        entry = Entry(type='minor', description='\nfoo')
+        self.assertEqual('foo', entry.description)
+
+        entry.description = ' \nfoo \n'
+        self.assertEqual('foo', entry.description)
+
+        # internal whitespace is left alone
+        entry.description = ' \nfoo bar\nbaz \n'
+        self.assertEqual('foo bar\nbaz', entry.description)
