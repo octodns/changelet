@@ -288,6 +288,27 @@ class TestGetCurrentVersion(TestCase):
             self.assertEqual(2, ver.minor)
             self.assertEqual(1, ver.patch)
 
+    @patch('changelet.command.bump.path')
+    def test_get_current_version_prepends_to_path(self, path_mock):
+        # Simulate the case where a module exists in virtualenv
+        # but we want to get the local version from directory
+        with TemporaryDirectory() as td:
+            module_name = 'foo_bar'
+            with open(join(td.dirname, f'{module_name}.py'), 'w') as fh:
+                fh.write('__version__ = "3.2.1"')
+
+            # Create a mock sys.path that includes the module elsewhere
+            path_mock.__contains__ = lambda self, x: True
+
+            try:
+                _get_current_version(module_name, directory=td.dirname)
+            except:
+                # import_module will fail with our mock, but we can check the path call
+                pass
+
+            # Verify that insert(0, ...) was called to prepend, not append
+            path_mock.insert.assert_called_once_with(0, td.dirname)
+
 
 class TestVersion(TestCase):
 
