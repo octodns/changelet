@@ -27,8 +27,6 @@ class Entry:
             pieces = fh.read().split('---\n')
             data = safe_load(pieces[1])
             description = pieces[2]
-            if description[-1] == '\n':
-                description = description[:-1]
             if 'pr' in data:
                 pr = config.provider.pr_by_id(
                     root=config.root, directory=config.directory, id=data['pr']
@@ -59,10 +57,20 @@ class Entry:
         return entries
 
     def __init__(self, type, description, pr=None, filename=None):
+        self._description = None
+
         self.type = type
         self.description = description
         self.pr = pr
         self.filename = filename
+
+    @property
+    def description(self):
+        return self._description
+
+    @description.setter
+    def description(self, value):
+        self._description = value.strip()
 
     @property
     def _ordering(self):
