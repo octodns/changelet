@@ -14,7 +14,11 @@ from changelet.entry import Entry
 
 
 def _get_current_version(module_name, directory='.'):
-    path.append(directory)
+    # make sure that our current directory is in the python path so that we
+    # prefer the version accessible in our CWD. If the module is in a
+    # subdirectory, e.g. lib/the_thing, it'll be on the user to get the correct
+    # one in the path
+    path.insert(0, directory)
     module = import_module(module_name)
     return Version.parse(module.__version__)
 
