@@ -27,11 +27,19 @@ from changelet.pr import Pr
 class TestCommandBump(TestCase, AssertActionMixin):
 
     class MockArgs:
-        def __init__(self, title, version=None, make_changes=False, pr=False):
+        def __init__(
+            self,
+            title,
+            version=None,
+            make_changes=False,
+            pr=False,
+            ignore_local_changes=False,
+        ):
             self.title = title
             self.make_changes = make_changes
             self.version = version
             self.pr = pr
+            self.ignore_local_changes = ignore_local_changes
 
     def test_configure(self):
         create = Bump()
@@ -44,6 +52,11 @@ class TestCommandBump(TestCase, AssertActionMixin):
             actions['make_changes'], flags=['--make-changes'], default=False
         )
         self.assert_action(actions['pr'], flags=['--pr'], default=False)
+        self.assert_action(
+            actions['ignore_local_changes'],
+            flags=['--ignore-local-changes'],
+            default=False,
+        )
         # 3.12 made a change to * so that required=False, before that it was
         # True, for now we'll have to ignore it
         required = False if version_info >= (3, 12, 0) else None
@@ -325,11 +338,19 @@ class TestVersion(TestCase):
 class TestCommandBumpPR(TestCase):
 
     class MockArgs:
-        def __init__(self, title, version=None, make_changes=False, pr=False):
+        def __init__(
+            self,
+            title,
+            version=None,
+            make_changes=False,
+            pr=False,
+            ignore_local_changes=False,
+        ):
             self.title = title
             self.make_changes = make_changes
             self.version = version
             self.pr = pr
+            self.ignore_local_changes = ignore_local_changes
 
     @patch('changelet.command.bump.run')
     @patch('changelet.command.bump.Bump.exit')
@@ -843,3 +864,81 @@ class TestCommandBumpPR(TestCase):
 
             self.assertIsNone(result)
             exit_mock.assert_called_with(1)
+
+    @patch('changelet.entry.remove')
+    @patch('changelet.command.bump.run')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_pr_ignore_local_changes(
+        self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        now = datetime.now().replace(tzinfo=timezone.utc)
+        ela_mock.return_value = [
+            Entry(
+                type='minor',
+                description='change 1',
+                pr=Pr(
+                    id=1,
+                    text='text 1',
+                    url='http://1',
+                    merged_at=now - timedelta(days=1),
+                ),
+            )
+        ]
+
+        exit_mock.return_value = None
+
+        # Mock responses for git commands
+        def run_side_effect(cmd_args, **kwargs):
+            result = type('obj', (object,), {})()
+            result.returncode = 0
+            result.stdout = ''
+            result.stderr = ''
+            if cmd_args == ['git', 'branch', '--show-current']:
+                result.stdout = 'main\n'
+            elif cmd_args == ['git', 'status', '--porcelain']:
+                # Should not be called when ignore_local_changes is True
+                raise AssertionError(
+                    'git status should not be called with --ignore-local-changes'
+                )
+            elif cmd_args[0:2] == ['gh', 'pr']:
+                result.stdout = 'https://github.com/test/repo/pull/1\n'
+            return result
+
+        run_mock.side_effect = run_side_effect
+
+        with TemporaryDirectory() as td:
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            with open(changelog, 'w') as fh:
+                fh.write('fin')
+
+            init = join(td.dirname, basename(td.dirname))
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            config = Config(join(td.dirname, '.cl'), provider=None)
+
+            # give our entries filenames
+            for i, entry in enumerate(ela_mock.return_value):
+                entry.filename = join(config.directory, f'ela-{i:04d}.md')
+
+            new_version, buf = cmd.run(
+                self.MockArgs([], pr=True, ignore_local_changes=True),
+                config=config,
+                root=td.dirname,
+            )
+
+            self.assertEqual('0.2.0', new_version)
+
+            # Verify git status --porcelain was NOT called
+            calls = run_mock.call_args_list
+            status_calls = [
+                c for c in calls if c[0][0] == ['git', 'status', '--porcelain']
+            ]
+            self.assertEqual(0, len(status_calls))
