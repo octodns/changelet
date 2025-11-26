@@ -66,6 +66,11 @@ class Bump:
             help='Create a pull request with the version bump',
         )
         parser.add_argument(
+            '--ignore-local-changes',
+            action='store_true',
+            help='Skip checking for local changes when using --pr',
+        )
+        parser.add_argument(
             'title', nargs='*', help='A short title/quip for the release title'
         )
 
@@ -92,19 +97,22 @@ class Bump:
                 )
                 return self.exit(1)
 
-            # Check for unstaged changes
-            result = run(
-                ['git', 'status', '--porcelain'], capture_output=True, text=True
-            )
-            if result.returncode != 0:
-                print('Failed to check git status', file=stderr)
-                return self.exit(1)
-            if result.stdout.strip():
-                print(
-                    'Error: Unstaged changes detected. Please commit or stash them.',
-                    file=stderr,
+            # Check for unstaged changes (unless --ignore-local-changes is set)
+            if not args.ignore_local_changes:
+                result = run(
+                    ['git', 'status', '--porcelain'],
+                    capture_output=True,
+                    text=True,
                 )
-                return self.exit(1)
+                if result.returncode != 0:
+                    print('Failed to check git status', file=stderr)
+                    return self.exit(1)
+                if result.stdout.strip():
+                    print(
+                        'Error: Unstaged changes detected. Please commit or stash them.',
+                        file=stderr,
+                    )
+                    return self.exit(1)
 
             # Pull latest changes
             result = run(['git', 'pull'], capture_output=True, text=True)
