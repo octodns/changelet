@@ -6,6 +6,8 @@
 from datetime import datetime
 from json import loads
 from logging import getLogger
+from os import environ
+from shlex import split as shlex_split
 from subprocess import PIPE, run
 
 from .pr import Pr
@@ -98,7 +100,12 @@ class GitHubCli:
         }
 
     def add_file(self, filename):
-        run(['git', 'add', filename], check=True)
+        cmd = ['git', 'add', filename]
+        extra_args = environ.get('CHANGELET_GIT_ADD_ARGS', '').strip()
+        if extra_args:
+            # Use shlex.split to handle quoted arguments properly
+            cmd[2:2] = shlex_split(extra_args)
+        run(cmd, check=True)
 
     def has_staged(self):
         result = run(
@@ -107,7 +114,12 @@ class GitHubCli:
         return len(result.stdout) > 0
 
     def commit(self, description):
-        run(['git', 'commit', '-m', description], check=True)
+        cmd = ['git', 'commit', '--message', description]
+        extra_args = environ.get('CHANGELET_GIT_COMMIT_ARGS', '').strip()
+        if extra_args:
+            # Use shlex.split to handle quoted arguments properly
+            cmd[2:2] = shlex_split(extra_args)
+        run(cmd, check=True)
 
     def __repr__(self):
         return f'GitHubCli<repo={self.repo}, max_lookback={self.max_lookback}>'
