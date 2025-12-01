@@ -186,6 +186,44 @@ class TestGitHubCli(TestCase):
         args = run_mock.call_args[0][0]
         self.assertTrue(filename in args)
 
+    @patch('changelet.github.environ')
+    @patch('changelet.github.run')
+    def test_add_file_with_extra_args(self, run_mock, environ_mock):
+        gh = GitHubCli()
+        filename = 'foo.bar'
+
+        # Test with single extra argument
+        run_mock.reset_mock()
+        environ_mock.get.return_value = '--force'
+        gh.add_file(filename)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'add', '--force', filename], args)
+
+        # Test with multiple extra arguments
+        run_mock.reset_mock()
+        environ_mock.get.return_value = '--force --verbose'
+        gh.add_file(filename)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'add', '--force', '--verbose', filename], args)
+
+        # Test with empty string
+        run_mock.reset_mock()
+        environ_mock.get.return_value = ''
+        gh.add_file(filename)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'add', filename], args)
+
+        # Test with whitespace only
+        run_mock.reset_mock()
+        environ_mock.get.return_value = '   '
+        gh.add_file(filename)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'add', filename], args)
+
     @patch('changelet.github.run')
     def test_has_staged(self, run_mock):
         gh = GitHubCli()
@@ -210,3 +248,73 @@ class TestGitHubCli(TestCase):
         run_mock.assert_called_once()
         args = run_mock.call_args[0][0]
         self.assertTrue(description in args)
+
+    @patch('changelet.github.environ')
+    @patch('changelet.github.run')
+    def test_commit_with_extra_args(self, run_mock, environ_mock):
+        gh = GitHubCli()
+        description = 'Hello World'
+
+        # Test with single extra argument
+        run_mock.reset_mock()
+        environ_mock.get.return_value = '--no-verify'
+        gh.commit(description)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(
+            ['git', 'commit', '--no-verify', '--message', description], args
+        )
+
+        # Test with multiple extra arguments
+        run_mock.reset_mock()
+        environ_mock.get.return_value = '--no-verify --signoff'
+        gh.commit(description)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(
+            [
+                'git',
+                'commit',
+                '--no-verify',
+                '--signoff',
+                '--message',
+                description,
+            ],
+            args,
+        )
+
+        # Test with quoted arguments
+        run_mock.reset_mock()
+        environ_mock.get.return_value = (
+            '--no-verify --author="John Doe <john@example.com>"'
+        )
+        gh.commit(description)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(
+            [
+                'git',
+                'commit',
+                '--no-verify',
+                '--author=John Doe <john@example.com>',
+                '--message',
+                description,
+            ],
+            args,
+        )
+
+        # Test with empty string
+        run_mock.reset_mock()
+        environ_mock.get.return_value = ''
+        gh.commit(description)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'commit', '--message', description], args)
+
+        # Test with whitespace only
+        run_mock.reset_mock()
+        environ_mock.get.return_value = '   '
+        gh.commit(description)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'commit', '--message', description], args)
