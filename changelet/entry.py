@@ -45,6 +45,16 @@ class Entry:
             )
 
     @classmethod
+    def load_file(cls, filename):
+        with open(filename, 'r') as fh:
+            pieces = fh.read().split('---\n')
+            data = safe_load(pieces[1])
+            description = pieces[2]
+            return Entry(
+                filename=filename, type=data['type'], description=description
+            )
+
+    @classmethod
     def load_all(cls, config):
         directory = config.directory
         entries = []

@@ -3,6 +3,8 @@
 #
 
 from os.path import join
+from sys import exit as sys_exit
+from sys import stderr
 from uuid import uuid4
 
 from changelet.entry import Entry
@@ -17,7 +19,8 @@ class Create:
             '-t',
             '--type',
             choices=('none', 'patch', 'minor', 'major'),
-            required=True,
+            required=False,
+            default=None,
             help='''The scope of the change.
 
 * patch - This is a bug fix
@@ -50,15 +53,65 @@ See https://semver.org/ for more info''',
             help='`git commit` add the entry and commit staged changes using the same description',
         )
         parser.add_argument(
+            '--continue',
+            dest='continue_',
+            action='store_true',
+            default=False,
+            help='Continue a previously failed commit attempt',
+        )
+        parser.add_argument(
             'description',
             metavar='change-description',
-            nargs='+',
+            nargs='*',
+            default=None,
             help='''A short description of the changes in this PR, suitable as an entry in
 CHANGELOG.md. Should be a single line. Can option include simple markdown formatting
 and links.''',
         )
 
     def run(self, args, config):
+        if args.continue_:
+            filename = config.provider.staged_changelog_entry(config.directory)
+            if filename is None:
+                print(
+                    'No staged changelog entry found to continue.', file=stderr
+                )
+                return sys_exit(1)
+
+            entry = Entry.load_file(filename)
+            description = entry.description
+
+            if not config.provider.has_staged():
+                description = f'{config.commit_prefix}{description}'
+            config.provider.commit(description)
+            print(
+                f'Created {entry.filename}, it has been committed'
+                ' along with staged changes.'
+            )
+            return entry
+
+        if args.commit:
+            staged = config.provider.staged_changelog_entry(config.directory)
+            if staged:
+                print(
+                    f'A changelog entry is already staged'
+                    f' ({staged}), likely from a previous'
+                    f' failed commit attempt. Please run'
+                    f' `changelet create --continue` to'
+                    f' re-attempt the commit, or unstage'
+                    f' the entry with `git reset HEAD'
+                    f' {staged}` and try again.',
+                    file=stderr,
+                )
+                return sys_exit(1)
+
+        if args.type is None:
+            print('error: -t/--type is required', file=stderr)
+            return sys_exit(1)
+        if not args.description:
+            print('error: description is required', file=stderr)
+            return sys_exit(1)
+
         filename = join(config.directory, f'{uuid4().hex}.md')
         description = ' '.join(args.description)
         entry = Entry(
@@ -77,15 +130,18 @@ and links.''',
                     description = f'{config.commit_prefix}{description}'
                 config.provider.commit(description)
                 print(
-                    f'Created {entry.filename}, it has been committed along with staged changes.'
+                    f'Created {entry.filename}, it has been committed'
+                    ' along with staged changes.'
                 )
             else:
                 print(
-                    f'Created {entry.filename}, it has been staged and should be committed to your branch.'
+                    f'Created {entry.filename}, it has been staged and'
+                    ' should be committed to your branch.'
                 )
         else:
             print(
-                f'Created {entry.filename}, it can be further edited and should be committed to your branch.'
+                f'Created {entry.filename}, it can be further edited'
+                ' and should be committed to your branch.'
             )
 
         return entry

@@ -113,6 +113,17 @@ class GitHubCli:
         )
         return len(result.stdout) > 0
 
+    def staged_changelog_entry(self, directory):
+        result = run(
+            ['git', 'diff', '--staged', '--name-only'],
+            check=True,
+            capture_output=True,
+        )
+        for line in result.stdout.decode('utf-8').split():
+            if line.startswith(directory) and line.endswith('.md'):
+                return line
+        return None
+
     def commit(self, description):
         cmd = ['git', 'commit', '--message', description]
         extra_args = environ.get('CHANGELET_GIT_COMMIT_ARGS', '').strip()
