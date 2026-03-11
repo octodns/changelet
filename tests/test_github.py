@@ -241,15 +241,29 @@ class TestGitHubCli(TestCase):
     def test_has_staged(self, run_mock):
         gh = GitHubCli()
 
+        # no staged files
         run_mock.reset_mock()
-        run_mock.return_value = self.ResultMock('')
+        run_mock.return_value = self.ResultMock(b'')
         self.assertFalse(gh.has_staged())
         run_mock.assert_called_once()
 
+        # staged files present
         run_mock.reset_mock()
-        run_mock.return_value = self.ResultMock('There is output, thus changes')
+        run_mock.return_value = self.ResultMock(b'src/foo.py\nREADME.md')
         self.assertTrue(gh.has_staged())
         run_mock.assert_called_once()
+
+        # exclude the only staged file
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(b'.changelog/abc123.md')
+        self.assertFalse(gh.has_staged(exclude='.changelog/abc123.md'))
+
+        # exclude one of multiple staged files
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(
+            b'src/foo.py\n.changelog/abc123.md'
+        )
+        self.assertTrue(gh.has_staged(exclude='.changelog/abc123.md'))
 
     @patch('changelet.github.run')
     def test_staged_changelog_entry(self, run_mock):
@@ -279,6 +293,13 @@ class TestGitHubCli(TestCase):
         # staged .md file but not in the changelog directory
         run_mock.reset_mock()
         run_mock.return_value = self.ResultMock(b'docs/notes.md')
+        self.assertIsNone(gh.staged_changelog_entry(directory))
+
+        # staged .md file in a similarly named directory
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(
+            b'.changelog-extra/something.md'
+        )
         self.assertIsNone(gh.staged_changelog_entry(directory))
 
     @patch('changelet.github.run')

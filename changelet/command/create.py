@@ -81,7 +81,7 @@ and links.''',
             entry = Entry.load_file(filename)
             description = entry.description
 
-            if not config.provider.has_staged():
+            if not config.provider.has_staged(exclude=filename):
                 description = f'{config.commit_prefix}{description}'
             config.provider.commit(description)
             print(

@@ -171,7 +171,9 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             provider_mock.staged_changelog_entry.return_value = staged_file
             provider_mock.has_staged.return_value = False
             create.run(args, config)
-            provider_mock.has_staged.assert_called_once()
+            provider_mock.has_staged.assert_called_once_with(
+                exclude=staged_file
+            )
             provider_mock.commit.assert_called_once_with('xyz: Hello World')
 
             # staged entry found, with other staged changes (no prefix)
@@ -180,6 +182,9 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             provider_mock.staged_changelog_entry.return_value = staged_file
             provider_mock.has_staged.return_value = True
             create.run(args, config)
+            provider_mock.has_staged.assert_called_once_with(
+                exclude=staged_file
+            )
             provider_mock.commit.assert_called_once_with('Hello World')
 
     @patch('changelet.command.create.sys_exit')
