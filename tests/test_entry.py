@@ -88,7 +88,7 @@ class TestEntry(TestCase):
                 self.assertEqual(type, data['type'])
                 # we gave it a PR before safe so it's id be recorded in there
                 self.assertEqual(pr.id, data['pr'])
-                self.assertEqual(description, pieces[2])
+                self.assertEqual(f'{description}\n', pieces[2])
 
             # load what was saved
             config = Config(directory='.cl', provider=None)
