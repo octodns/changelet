@@ -137,6 +137,25 @@ class TestEntry(TestCase):
             self.assertTrue(entry.remove())
             self.assertFalse(isfile(entry.filename))
 
+    def test_load_file(self):
+        with TemporaryDirectory() as td:
+            type = 'patch'
+            description = 'This is a test entry'
+            directory = join(td.dirname, '.changelog')
+            filename = join(directory, 'test-entry.md')
+            makedirs(directory)
+
+            # save an entry
+            entry = Entry(type=type, description=description, filename=filename)
+            entry.save()
+
+            # load it using load_file (no PR lookup)
+            loaded = Entry.load_file(filename)
+            self.assertEqual(entry.type, loaded.type)
+            self.assertEqual(entry.description, loaded.description)
+            self.assertEqual(entry.filename, loaded.filename)
+            self.assertIsNone(loaded.pr)
+
     def test_load_all(self):
         provider = DummyProvider()
 

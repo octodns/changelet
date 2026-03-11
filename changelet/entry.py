@@ -22,27 +22,34 @@ class Entry:
     ORDERING = {'major': 3, 'minor': 2, 'patch': 1, 'none': 0, '': 0}
 
     @classmethod
-    def load(self, filename, config):
+    def _parse_file(cls, filename):
         with open(filename, 'r') as fh:
             pieces = fh.read().split('---\n')
             data = safe_load(pieces[1])
             description = pieces[2]
-            if 'pr' in data:
-                pr = config.provider.pr_by_id(
-                    root=config.root, directory=config.directory, id=data['pr']
-                )
-            else:
-                pr = config.provider.pr_by_filename(
-                    root=config.root,
-                    directory=config.directory,
-                    filename=filename,
-                )
-            return Entry(
-                filename=filename,
-                type=data['type'],
-                description=description,
-                pr=pr,
+            return data, description
+
+    @classmethod
+    def load(cls, filename, config):
+        data, description = cls._parse_file(filename)
+        if 'pr' in data:
+            pr = config.provider.pr_by_id(
+                root=config.root, directory=config.directory, id=data['pr']
             )
+        else:
+            pr = config.provider.pr_by_filename(
+                root=config.root, directory=config.directory, filename=filename
+            )
+        return Entry(
+            filename=filename, type=data['type'], description=description, pr=pr
+        )
+
+    @classmethod
+    def load_file(cls, filename):
+        data, description = cls._parse_file(filename)
+        return Entry(
+            filename=filename, type=data['type'], description=description
+        )
 
     @classmethod
     def load_all(cls, config):

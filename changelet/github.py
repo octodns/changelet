@@ -107,11 +107,27 @@ class GitHubCli:
             cmd[2:2] = shlex_split(extra_args)
         run(cmd, check=True)
 
-    def has_staged(self):
+    def has_staged(self, exclude=None):
         result = run(
-            ['git', 'diff', '--staged'], check=True, capture_output=True
+            ['git', 'diff', '--staged', '--name-only'],
+            check=True,
+            capture_output=True,
         )
-        return len(result.stdout) > 0
+        files = set(result.stdout.decode('utf-8').split())
+        if exclude:
+            files -= {exclude}
+        return len(files) > 0
+
+    def staged_changelog_entry(self, directory):
+        result = run(
+            ['git', 'diff', '--staged', '--name-only'],
+            check=True,
+            capture_output=True,
+        )
+        for line in result.stdout.decode('utf-8').split():
+            if line.startswith(f'{directory}/') and line.endswith('.md'):
+                return line
+        return None
 
     def commit(self, description):
         cmd = ['git', 'commit', '--message', description]

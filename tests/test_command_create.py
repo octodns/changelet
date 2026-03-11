@@ -3,6 +3,7 @@
 #
 
 from argparse import ArgumentParser
+from os import makedirs
 from os.path import join
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
@@ -31,15 +32,18 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             flags=['-t', '--type'],
             nargs=1,
             default=None,
-            required=True,
+            required=False,
             choices={'none', 'patch', 'minor', 'major'},
+        )
+        self.assert_action(
+            actions['continue_'], flags=['--continue'], default=False
         )
         self.assert_action(
             actions['description'],
             flags=[],
-            nargs='+',
+            nargs='*',
             default=None,
-            required=True,
+            required=False,
         )
 
     @patch('changelet.entry.Entry.save')
@@ -55,6 +59,7 @@ class TestCommandCreate(TestCase, AssertActionMixin):
                 self.pr = pr
                 self.add = add
                 self.commit = commit
+                self.continue_ = False
 
         with TemporaryDirectory() as td:
             type = 'patch'
@@ -103,6 +108,7 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             # commit w/staged
             save_mock.reset_mock()
             provider_mock.reset_mock()
+            provider_mock.staged_changelog_entry.return_value = None
             provider_mock.has_staged.return_value = True
             args.add = False
             args.commit = True
@@ -116,6 +122,7 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             # commit w/o staged
             save_mock.reset_mock()
             provider_mock.reset_mock()
+            provider_mock.staged_changelog_entry.return_value = None
             provider_mock.has_staged.return_value = False
             args.add = False
             args.commit = True
@@ -126,3 +133,129 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             # custom/overridden config_prefix
             provider_mock.commit.assert_called_once_with(f'xyz: {description}')
             save_mock.assert_called_once()
+
+    @patch('changelet.command.create.sys_exit')
+    def test_run_continue(self, exit_mock):
+
+        class ArgsMock:
+            continue_ = True
+
+        with TemporaryDirectory() as td:
+            directory = join(td.dirname, '.cl')
+            config = Config(
+                directory=directory, commit_prefix='xyz: ', provider=None
+            )
+            config._provider = provider_mock = MagicMock()
+            create = Create()
+            args = ArgsMock()
+
+            # no staged entry found
+            provider_mock.reset_mock()
+            exit_mock.reset_mock()
+            provider_mock.staged_changelog_entry.return_value = None
+            create.run(args, config)
+            provider_mock.staged_changelog_entry.assert_called_once_with(
+                directory
+            )
+            exit_mock.assert_called_once_with(1)
+
+            # staged entry found, no other staged changes (prefix added)
+            provider_mock.reset_mock()
+            exit_mock.reset_mock()
+            description = 'Hello World'
+            staged_file = join(directory, 'abc123.md')
+            makedirs(directory)
+            with open(staged_file, 'w') as fh:
+                fh.write('---\ntype: patch\n---\n')
+                fh.write(description)
+            provider_mock.staged_changelog_entry.return_value = staged_file
+            provider_mock.has_staged.return_value = False
+            create.run(args, config)
+            provider_mock.has_staged.assert_called_once_with(
+                exclude=staged_file
+            )
+            provider_mock.commit.assert_called_once_with('xyz: Hello World')
+
+            # staged entry found, with other staged changes (no prefix)
+            provider_mock.reset_mock()
+            exit_mock.reset_mock()
+            provider_mock.staged_changelog_entry.return_value = staged_file
+            provider_mock.has_staged.return_value = True
+            create.run(args, config)
+            provider_mock.has_staged.assert_called_once_with(
+                exclude=staged_file
+            )
+            provider_mock.commit.assert_called_once_with('Hello World')
+
+    @patch('changelet.command.create.sys_exit')
+    @patch('changelet.entry.Entry.save')
+    def test_run_commit_already_staged(self, save_mock, exit_mock):
+
+        class ArgsMock:
+            continue_ = False
+            type = 'patch'
+            description = ['Hello', 'World']
+            pr = None
+            add = False
+            commit = True
+
+        with TemporaryDirectory() as td:
+            directory = join(td.dirname, '.cl')
+            config = Config(
+                directory=directory, commit_prefix='xyz: ', provider=None
+            )
+            config._provider = provider_mock = MagicMock()
+            create = Create()
+            args = ArgsMock()
+
+            # already staged changelog entry detected
+            provider_mock.staged_changelog_entry.return_value = (
+                '.cl/existing.md'
+            )
+            create.run(args, config)
+            provider_mock.staged_changelog_entry.assert_called_once_with(
+                directory
+            )
+            exit_mock.assert_called_once_with(1)
+            # entry should not have been saved
+            save_mock.assert_not_called()
+            provider_mock.add_file.assert_not_called()
+            provider_mock.commit.assert_not_called()
+
+    @patch('changelet.command.create.sys_exit')
+    def test_run_missing_required_args(self, exit_mock):
+
+        class ArgsMock:
+            def __init__(self, type=None, description=None):
+                self.continue_ = False
+                self.add = False
+                self.commit = False
+                self.pr = None
+                self.type = type
+                self.description = description
+
+        with TemporaryDirectory() as td:
+            directory = join(td.dirname, '.cl')
+            config = Config(
+                directory=directory, commit_prefix='xyz: ', provider=None
+            )
+            config._provider = MagicMock()
+            create = Create()
+
+            # missing type
+            args = ArgsMock(type=None, description=['Hello'])
+            exit_mock.reset_mock()
+            create.run(args, config)
+            exit_mock.assert_called_once_with(1)
+
+            # missing description
+            args = ArgsMock(type='patch', description=None)
+            exit_mock.reset_mock()
+            create.run(args, config)
+            exit_mock.assert_called_once_with(1)
+
+            # empty description list
+            args = ArgsMock(type='patch', description=[])
+            exit_mock.reset_mock()
+            create.run(args, config)
+            exit_mock.assert_called_once_with(1)
