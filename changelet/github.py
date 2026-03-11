@@ -64,7 +64,7 @@ class GitHubCli:
                 files = [
                     f['path']
                     for f in pr['files']
-                    if f['path'].startswith(directory)
+                    if f['path'].startswith(f'{directory}/')
                 ]
                 if not files:
                     # no changelog entries, ignore it
@@ -96,7 +96,7 @@ class GitHubCli:
         return {
             l
             for l in result.stdout.decode('utf-8').split()
-            if l.endswith('.md') and l.startswith(directory)
+            if l.endswith('.md') and l.startswith(f'{directory}/')
         }
 
     def add_file(self, filename):

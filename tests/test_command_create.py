@@ -114,8 +114,8 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             args.commit = True
             entry = create.run(args, config)
             new_filename = entry.filename
-            provider_mock.add_file.assert_called_once_with(new_filename)
             provider_mock.has_staged.assert_called_once()
+            provider_mock.add_file.assert_called_once_with(new_filename)
             provider_mock.commit.assert_called_once_with(description)
             save_mock.assert_called_once()
 
@@ -128,8 +128,8 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             args.commit = True
             entry = create.run(args, config)
             new_filename = entry.filename
-            provider_mock.add_file.assert_called_once_with(new_filename)
             provider_mock.has_staged.assert_called_once()
+            provider_mock.add_file.assert_called_once_with(new_filename)
             # custom/overridden config_prefix
             provider_mock.commit.assert_called_once_with(f'xyz: {description}')
             save_mock.assert_called_once()
