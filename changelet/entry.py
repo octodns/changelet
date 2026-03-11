@@ -93,6 +93,7 @@ class Entry:
                 fh.write(str(self.pr.id))
             fh.write('\n---\n')
             fh.write(self.description)
+            fh.write('\n')
         self.filename = filename
 
     def remove(self):
