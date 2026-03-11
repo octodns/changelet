@@ -99,7 +99,9 @@ class TestGitHubCli(TestCase):
                             'number': '43',
                         },
                         {
-                            'files': [{'path': 'other-file.md'}],
+                            'files': [
+                                {'path': '.changelog-extra/something.md'}
+                            ],
                             'mergedAt': '2025-07-03T10:42',
                             'number': '44',
                         },
@@ -168,6 +170,17 @@ class TestGitHubCli(TestCase):
         run_mock.reset_mock()
         run_mock.return_value = self.ResultMock(
             b'foo/bar.py\n.foobar/blip.md\nother.txt'
+        )
+        self.assertEqual(
+            {'.foobar/blip.md'},
+            gh.changelog_entries_in_branch(root='', directory=directory),
+        )
+        run_mock.assert_called_once()
+
+        # prefix match should not include files from similar directories
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(
+            b'.foobar/blip.md\n.foobar-extra/blip.md'
         )
         self.assertEqual(
             {'.foobar/blip.md'},
