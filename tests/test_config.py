@@ -63,11 +63,9 @@ class TestConfig(TestCase):
             # no section
             filename = join(td.dirname, 'pyproject.toml')
             with open(filename, 'w') as fh:
-                fh.write(
-                    '''[tool.other]
+                fh.write('''[tool.other]
 key = "value"
-'''
-                )
+''')
             config = Config()
             config.load_pyproject_toml(filename)
             defaults = Config()
@@ -77,14 +75,12 @@ key = "value"
 
             # valid
             with open(filename, 'w') as fh:
-                fh.write(
-                    '''[tool.changelet]
+                fh.write('''[tool.changelet]
 root = "blip"
 directory = ".location"
 provider.class = "changelet.github.GitHubCli"
 provider.repo = "org/repo"
-'''
-                )
+''')
             config = Config()
             config.load_pyproject_toml(filename)
             self.assertEqual('blip', config.root)
@@ -97,10 +93,8 @@ provider.repo = "org/repo"
             # no data
             filename = join(td.dirname, '.changelet.yaml')
             with open(filename, 'w') as fh:
-                fh.write(
-                    '''---
-'''
-                )
+                fh.write('''---
+''')
             config = Config()
             config.load_yaml(filename)
             defaults = Config()
@@ -110,15 +104,13 @@ provider.repo = "org/repo"
 
             # valid
             with open(filename, 'w') as fh:
-                fh.write(
-                    '''---
+                fh.write('''---
 root: blip
 directory: .location
 provider:
     class: changelet.github.GitHubCli
     repo: org/repo
-'''
-                )
+''')
             config = Config()
             config.load_yaml(filename)
             self.assertEqual('blip', config.root)
@@ -145,11 +137,9 @@ provider:
         # precedence
         with TemporaryDirectory() as td:
             with open(join(td.dirname, 'pyproject.toml'), 'w') as fh:
-                fh.write(
-                    '''[tool.changelet]
+                fh.write('''[tool.changelet]
 directory = "from_pyproject_toml"
-'''
-                )
+''')
             config = Config.build(root=td.dirname)
             # matches the root we passed in so that it'd fine the pyproject.toml
             self.assertEqual(td.dirname, config.root)
@@ -158,11 +148,9 @@ directory = "from_pyproject_toml"
             # create a .changelet.yaml to override pyproject.toml
             filename = join(td.dirname, '.changelet.yaml')
             with open(filename, 'w') as fh:
-                fh.write(
-                    '''---
+                fh.write('''---
 directory: from_yaml
-'''
-                )
+''')
             config = Config.build(root=td.dirname)
             # matches the root we passed in so that it'd fine the pyproject.toml
             self.assertEqual(td.dirname, config.root)
