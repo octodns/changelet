@@ -12,6 +12,7 @@ from helpers import AssertActionMixin, TemporaryDirectory
 
 from changelet.command.create import Create
 from changelet.config import Config
+from changelet.entry import EntryType
 
 
 class TestCommandCreate(TestCase, AssertActionMixin):
@@ -77,7 +78,7 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             provider_mock.reset_mock()
             entry = create.run(args, config)
             # args made it through
-            self.assertEqual(type, entry.type)
+            self.assertEqual(EntryType(type), entry.type)
             self.assertEqual(description, entry.description)
             self.assertIsNone(entry.pr)
             filename = entry.filename
@@ -95,7 +96,7 @@ class TestCommandCreate(TestCase, AssertActionMixin):
             args.add = True
             entry = create.run(args, config)
             # args made it through
-            self.assertEqual(type, entry.type)
+            self.assertEqual(EntryType(type), entry.type)
             self.assertEqual(description, entry.description)
             self.assertEqual(pr, entry.pr)
             # new filename

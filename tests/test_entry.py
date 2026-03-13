@@ -11,7 +11,7 @@ from helpers import TemporaryDirectory
 from yaml import safe_load
 
 from changelet.config import Config
-from changelet.entry import Entry
+from changelet.entry import Entry, EntryType
 from changelet.pr import Pr
 
 
@@ -33,8 +33,13 @@ class TestEntry(TestCase):
         # smoke
         Entry(type='none', description='', pr=None, filename='').__repr__()
 
+    def test_invalid_type(self):
+        with self.assertRaises(ValueError):
+            Entry(type='pathc', description='typo')
+
     def test_properties(self):
         entry = Entry(type='none', description='', pr=None, filename='')
+        self.assertEqual(EntryType.NONE, entry.type)
         # no pr means epoch, none=0
         self.assertEqual((0, Entry.EPOCH), entry._ordering)
 
@@ -48,7 +53,16 @@ class TestEntry(TestCase):
 
         # change the type, get an updated ordering
         entry.type = 'minor'
+        self.assertEqual(EntryType.MINOR, entry.type)
         self.assertEqual((2, Entry.EPOCH), entry._ordering)
+
+        # setting with EntryType directly works too
+        entry.type = EntryType.PATCH
+        self.assertEqual(EntryType.PATCH, entry.type)
+        self.assertEqual((1, Entry.EPOCH), entry._ordering)
+
+        # set back to minor for the PR test below
+        entry.type = 'minor'
 
         # add a PR, update ordering
         merged_at = datetime(2025, 1, 12)
@@ -71,7 +85,7 @@ class TestEntry(TestCase):
             entry = Entry(
                 type=type, description=description, pr=pr, filename=filename
             )
-            self.assertEqual(type, entry.type)
+            self.assertEqual(EntryType.NONE, entry.type)
             self.assertEqual(description, entry.description)
             self.assertEqual(pr, entry.pr)
             self.assertEqual(filename, entry.filename)
@@ -255,7 +269,14 @@ class TestEntry(TestCase):
         entries.sort()
         self.assertEqual([5, 3, 1, 2, 0, 4], [e.pr.id for e in entries])
         self.assertEqual(
-            ['none', 'none', 'patch', 'minor', 'minor', 'major'],
+            [
+                EntryType.NONE,
+                EntryType.NONE,
+                EntryType.PATCH,
+                EntryType.MINOR,
+                EntryType.MINOR,
+                EntryType.MAJOR,
+            ],
             [e.type for e in entries],
         )
 
