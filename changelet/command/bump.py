@@ -11,7 +11,7 @@ from sys import exit, path, stderr
 
 from semver import Version
 
-from changelet.entry import Entry
+from changelet.entry import Entry, EntryType
 
 
 def _get_current_version(module_name, directory='.'):
@@ -33,11 +33,11 @@ def _get_new_version(current_version, entries):
         bump_type = entries[0].type
     except IndexError:
         return None
-    if bump_type == 'major':
+    if bump_type == EntryType.MAJOR:
         return current_version.bump_major()
-    elif bump_type == 'minor':
+    elif bump_type == EntryType.MINOR:
         return current_version.bump_minor()
-    elif bump_type == 'patch':
+    elif bump_type == EntryType.PATCH:
         return current_version.bump_patch()
     return None
 
@@ -153,12 +153,12 @@ class Bump:
         current_type = None
         for entry in entries:
             type = entry.type
-            if type == 'none':
+            if type == EntryType.NONE:
                 # these aren't included in the listing
                 continue
             if type != current_type:
                 buf.write('\n')
-                buf.write(type.capitalize())
+                buf.write(type.value.capitalize())
                 buf.write(':\n')
                 current_type = type
             buf.write(entry.markdown)

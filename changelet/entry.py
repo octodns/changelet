@@ -19,7 +19,12 @@ class EntryType(Enum):
 
 class Entry:
     EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-    ORDERING = {'major': 3, 'minor': 2, 'patch': 1, 'none': 0, '': 0}
+    ORDERING = {
+        EntryType.MAJOR: 3,
+        EntryType.MINOR: 2,
+        EntryType.PATCH: 1,
+        EntryType.NONE: 0,
+    }
 
     @classmethod
     def _parse_file(cls, filename):
@@ -65,11 +70,23 @@ class Entry:
 
     def __init__(self, type, description, pr=None, filename=None):
         self._description = None
+        self._type = None
 
         self.type = type
         self.description = description
         self.pr = pr
         self.filename = filename
+
+    @property
+    def type(self):
+        return self._type
+
+    @type.setter
+    def type(self, value):
+        if isinstance(value, EntryType):
+            self._type = value
+        else:
+            self._type = EntryType(value)
 
     @property
     def description(self):
@@ -94,7 +111,7 @@ class Entry:
             makedirs(directory)
         with open(filename, 'w') as fh:
             fh.write('---\ntype: ')
-            fh.write(self.type)
+            fh.write(self.type.value)
             if self.pr:
                 fh.write('\npr: ')
                 fh.write(str(self.pr.id))
@@ -133,4 +150,4 @@ class Entry:
         return self._ordering < other._ordering
 
     def __repr__(self):
-        return f'Entry<{self.type}, {self.description[:16]}, {self.filename}, {self.pr}>'
+        return f'Entry<{self.type.value}, {self.description[:16]}, {self.filename}, {self.pr}>'
