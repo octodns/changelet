@@ -6,9 +6,10 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta, timezone
 from os import makedirs
 from os.path import basename, join
+from subprocess import CalledProcessError
 from sys import path, version_info
 from unittest import TestCase
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 from helpers import AssertActionMixin, TemporaryDirectory
 from semver import Version
@@ -525,6 +526,8 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            provider_mock = MagicMock()
+            config._provider = provider_mock
 
             # give our entries filenames
             for i, entry in enumerate(ela_mock.return_value):
@@ -536,6 +539,14 @@ class TestCommandBumpPR(TestCase):
 
             self.assertEqual('0.2.0', new_version)
 
+            # Verify provider.add_file was called for each file
+            add_calls = provider_mock.add_file.call_args_list
+            self.assertEqual(changelog, add_calls[0][0][0])
+            self.assertEqual(init, add_calls[1][0][0])
+            self.assertEqual(
+                join(config.directory, 'ela-0000.md'), add_calls[2][0][0]
+            )
+
             # Verify all git commands were called
             calls = run_mock.call_args_list
             self.assertEqual(
@@ -546,15 +557,14 @@ class TestCommandBumpPR(TestCase):
             self.assertEqual(
                 ['git', 'checkout', '-b', 'rel-0-2-0'], calls[3][0][0]
             )
-            self.assertEqual(['git', 'add', '-p'], calls[4][0][0])
-            self.assertEqual(['git', 'commit', '-m'], calls[5][0][0][:3])
+            self.assertEqual(['git', 'commit', '-m'], calls[4][0][0][:3])
             self.assertEqual(
-                'Version 0.2.0 bump & changelog update', calls[5][0][0][3]
+                'Version 0.2.0 bump & changelog update', calls[4][0][0][3]
             )
             self.assertEqual(
-                ['git', 'push', '-u', 'origin', 'rel-0-2-0'], calls[6][0][0]
+                ['git', 'push', '-u', 'origin', 'rel-0-2-0'], calls[5][0][0]
             )
-            self.assertEqual(['gh', 'pr', 'create'], calls[7][0][0][:3])
+            self.assertEqual(['gh', 'pr', 'create'], calls[6][0][0][:3])
 
     @patch('changelet.entry.remove')
     @patch('changelet.command.bump.run')
@@ -625,7 +635,7 @@ class TestCommandBumpPR(TestCase):
     @patch('changelet.command.bump.Bump.exit')
     @patch('changelet.entry.Entry.load_all')
     @patch('changelet.command.bump._get_current_version')
-    def test_pr_git_add_fails(
+    def test_pr_staging_fails(
         self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
     ):
         cmd = Bump()
@@ -657,8 +667,6 @@ class TestCommandBumpPR(TestCase):
                 result.stdout = 'main\n'
             elif cmd_args == ['git', 'status', '--porcelain']:
                 result.stdout = ''
-            elif cmd_args == ['git', 'add', '-p']:
-                result.returncode = 1
             return result
 
         run_mock.side_effect = run_side_effect
@@ -675,6 +683,9 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            provider_mock = MagicMock()
+            provider_mock.add_file.side_effect = CalledProcessError(1, 'git')
+            config._provider = provider_mock
 
             result = cmd.run(
                 self.MockArgs([], pr=True), config=config, root=td.dirname
@@ -739,6 +750,7 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            config._provider = MagicMock()
 
             result = cmd.run(
                 self.MockArgs([], pr=True), config=config, root=td.dirname
@@ -803,6 +815,7 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            config._provider = MagicMock()
 
             result = cmd.run(
                 self.MockArgs([], pr=True), config=config, root=td.dirname
@@ -867,6 +880,7 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            config._provider = MagicMock()
 
             result = cmd.run(
                 self.MockArgs([], pr=True), config=config, root=td.dirname
@@ -933,6 +947,7 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            config._provider = MagicMock()
 
             # give our entries filenames
             for i, entry in enumerate(ela_mock.return_value):

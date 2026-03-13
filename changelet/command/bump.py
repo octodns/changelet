@@ -6,7 +6,7 @@ from datetime import datetime
 from importlib import import_module
 from io import StringIO
 from os.path import abspath, basename, join
-from subprocess import run
+from subprocess import CalledProcessError, run
 from sys import exit, path, stderr
 
 from semver import Version
@@ -208,9 +208,14 @@ class Bump:
 
             # If --pr is specified, stage, commit, push, and create PR
             if args.pr:
-                # Stage changes interactively
-                result = run(['git', 'add', '-p'])
-                if result.returncode != 0:
+                # Stage the specific files we modified
+                try:
+                    config.provider.add_file(changelog)
+                    config.provider.add_file(init)
+                    for entry in entries:
+                        if entry.filename:
+                            config.provider.add_file(entry.filename)
+                except CalledProcessError:
                     print('Failed to stage changes', file=stderr)
                     return self.exit(1)
 
