@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta, timezone
 from os import makedirs
 from os.path import basename, join
-from sys import version_info
+from sys import path, version_info
 from unittest import TestCase
 from unittest.mock import call, patch
 
@@ -298,31 +298,41 @@ class TestGetCurrentVersion(TestCase):
             with open(join(td.dirname, f'{module_name}.py'), 'w') as fh:
                 fh.write('__version__ = "3.2.1"')
 
+            original_path = path.copy()
             ver = _get_current_version(module_name, directory=td.dirname)
             self.assertEqual(3, ver.major)
             self.assertEqual(2, ver.minor)
             self.assertEqual(1, ver.patch)
+            # sys.path should be restored after the call
+            self.assertEqual(original_path, path)
 
     @patch('changelet.command.bump.path')
     def test_get_current_version_prepends_to_path(self, path_mock):
-        # Simulate the case where a module exists in virtualenv
-        # but we want to get the local version from directory
+        # Verify that directory is prepended to sys.path so that it takes
+        # precedence over virtualenv or system installs
         with TemporaryDirectory() as td:
             module_name = 'foo_bar'
             with open(join(td.dirname, f'{module_name}.py'), 'w') as fh:
                 fh.write('__version__ = "3.2.1"')
 
-            # Create a mock sys.path that includes the module elsewhere
             path_mock.__contains__ = lambda self, x: True
 
             try:
                 _get_current_version(module_name, directory=td.dirname)
-            except:
-                # import_module will fail with our mock, but we can check the path call
+            except Exception:
+                # import_module will fail with our mock, but we can
+                # check the path call
                 pass
 
-            # Verify that insert(0, ...) was called to prepend, not append
+            # Verify that insert(0, ...) was called to prepend
             path_mock.insert.assert_called_once_with(0, td.dirname)
+
+    def test_get_current_version_restores_path_on_error(self):
+        original_path = path.copy()
+        with self.assertRaises(ModuleNotFoundError):
+            _get_current_version('nonexistent_module_xyz', directory='/tmp')
+        # sys.path should be restored even when import fails
+        self.assertEqual(original_path, path)
 
 
 class TestVersion(TestCase):
