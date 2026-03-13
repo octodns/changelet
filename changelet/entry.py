@@ -24,7 +24,7 @@ class Entry:
     @classmethod
     def _parse_file(cls, filename):
         with open(filename, 'r') as fh:
-            pieces = fh.read().split('---\n')
+            pieces = fh.read().split('---\n', 2)
             data = safe_load(pieces[1])
             description = pieces[2]
             return data, description
