@@ -98,7 +98,7 @@ class Config:
                 for k, v in config.items():
                     setattr(self, k, v)
 
-    def load_yaml(self, filename=None):
+    def load_yaml(self, filename):
         with open(filename, 'rb') as fh:
             config = yaml_load(fh)
             if isinstance(config, dict):
