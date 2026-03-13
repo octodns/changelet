@@ -6,7 +6,7 @@ from datetime import datetime
 from importlib import import_module
 from io import StringIO
 from os.path import abspath, basename, join
-from subprocess import CalledProcessError, run
+from subprocess import CalledProcessError
 from sys import exit, path, stderr
 
 from semver import Version
@@ -85,44 +85,41 @@ class Bump:
         # If --pr is specified, validate git state and handle PR workflow
         if args.pr:
             # Check we're on main branch
-            result = run(
-                ['git', 'branch', '--show-current'],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
+            try:
+                current_branch = config.provider.current_branch()
+            except CalledProcessError:
                 print('Failed to get current branch', file=stderr)
                 return self.exit(1)
-            current_branch = result.stdout.strip()
             if current_branch != 'main':
                 print(
-                    f'Error: Must be on main branch, currently on {current_branch}',
+                    f'Error: Must be on main branch, currently'
+                    f' on {current_branch}',
                     file=stderr,
                 )
                 return self.exit(1)
 
             # Check for unstaged changes (unless --ignore-local-changes is set)
             if not args.ignore_local_changes:
-                result = run(
-                    ['git', 'status', '--porcelain'],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
+                try:
+                    has_changes = config.provider.has_local_changes()
+                except CalledProcessError:
                     print('Failed to check git status', file=stderr)
                     return self.exit(1)
-                if result.stdout.strip():
+                if has_changes:
                     print(
-                        'Error: Unstaged changes detected. Please commit or stash them.',
+                        'Error: Unstaged changes detected.'
+                        ' Please commit or stash them.',
                         file=stderr,
                     )
                     return self.exit(1)
 
             # Pull latest changes
-            result = run(['git', 'pull'], capture_output=True, text=True)
-            if result.returncode != 0:
+            try:
+                config.provider.pull()
+            except CalledProcessError as e:
                 print('Failed to pull latest changes', file=stderr)
-                print(result.stderr, file=stderr)
+                if e.stderr:
+                    print(e.stderr, file=stderr)
                 return self.exit(1)
 
         buf = StringIO()
@@ -175,15 +172,20 @@ class Bump:
         else:
             # If --pr is specified, create branch and make changes
             if args.pr:
-                branch_name = f'rel-{new_version.major}-{new_version.minor}-{new_version.patch}'
-                result = run(
-                    ['git', 'checkout', '-b', branch_name],
-                    capture_output=True,
-                    text=True,
+                branch_name = (
+                    f'rel-{new_version.major}'
+                    f'-{new_version.minor}'
+                    f'-{new_version.patch}'
                 )
-                if result.returncode != 0:
-                    print(f'Failed to create branch {branch_name}', file=stderr)
-                    print(result.stderr, file=stderr)
+                try:
+                    config.provider.create_branch(branch_name)
+                except CalledProcessError as e:
+                    print(
+                        f'Failed to create branch' f' {branch_name}',
+                        file=stderr,
+                    )
+                    if e.stderr:
+                        print(e.stderr, file=stderr)
                     return self.exit(1)
 
             changelog = join(root, 'CHANGELOG.md')
@@ -220,49 +222,38 @@ class Bump:
                     return self.exit(1)
 
                 # Commit changes
-                commit_message = f'Version {new_version.major}.{new_version.minor}.{new_version.patch} bump & changelog update'
-                result = run(
-                    ['git', 'commit', '-m', commit_message],
-                    capture_output=True,
-                    text=True,
+                commit_message = (
+                    f'Version {new_version.major}'
+                    f'.{new_version.minor}'
+                    f'.{new_version.patch}'
+                    f' bump & changelog update'
                 )
-                if result.returncode != 0:
+                try:
+                    config.provider.commit(commit_message)
+                except CalledProcessError as e:
                     print('Failed to commit changes', file=stderr)
-                    print(result.stderr, file=stderr)
+                    if e.stderr:
+                        print(e.stderr, file=stderr)
                     return self.exit(1)
 
                 # Push to origin
-                result = run(
-                    ['git', 'push', '-u', 'origin', branch_name],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
+                try:
+                    config.provider.push_branch(branch_name)
+                except CalledProcessError as e:
                     print('Failed to push branch', file=stderr)
-                    print(result.stderr, file=stderr)
+                    if e.stderr:
+                        print(e.stderr, file=stderr)
                     return self.exit(1)
 
                 # Create PR
-                result = run(
-                    [
-                        'gh',
-                        'pr',
-                        'create',
-                        '--title',
-                        commit_message,
-                        '--body',
-                        buf,
-                        '--assignee',
-                        '@me',
-                    ],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
+                try:
+                    url = config.provider.create_pr(commit_message, buf)
+                except CalledProcessError as e:
                     print('Failed to create PR', file=stderr)
-                    print(result.stderr, file=stderr)
+                    if e.stderr:
+                        print(e.stderr, file=stderr)
                     return self.exit(1)
 
-                print(result.stdout)
+                print(url)
 
         return new_version, buf
