@@ -6,7 +6,6 @@ from datetime import datetime
 from importlib import import_module
 from io import StringIO
 from os.path import abspath, basename, join
-from subprocess import CalledProcessError
 from sys import exit, path, stderr
 
 from semver import Version
@@ -85,11 +84,7 @@ class Bump:
         # If --pr is specified, validate git state and handle PR workflow
         if args.pr:
             # Check we're on main branch
-            try:
-                current_branch = config.provider.current_branch()
-            except CalledProcessError:
-                print('Failed to get current branch', file=stderr)
-                return self.exit(1)
+            current_branch = config.provider.current_branch()
             if current_branch != 'main':
                 print(
                     f'Error: Must be on main branch, currently'
@@ -100,12 +95,7 @@ class Bump:
 
             # Check for unstaged changes (unless --ignore-local-changes is set)
             if not args.ignore_local_changes:
-                try:
-                    has_changes = config.provider.has_local_changes()
-                except CalledProcessError:
-                    print('Failed to check git status', file=stderr)
-                    return self.exit(1)
-                if has_changes:
+                if config.provider.has_local_changes():
                     print(
                         'Error: Unstaged changes detected.'
                         ' Please commit or stash them.',
@@ -114,13 +104,7 @@ class Bump:
                     return self.exit(1)
 
             # Pull latest changes
-            try:
-                config.provider.pull()
-            except CalledProcessError as e:
-                print('Failed to pull latest changes', file=stderr)
-                if e.stderr:
-                    print(e.stderr, file=stderr)
-                return self.exit(1)
+            config.provider.pull()
 
         buf = StringIO()
 
@@ -177,16 +161,7 @@ class Bump:
                     f'-{new_version.minor}'
                     f'-{new_version.patch}'
                 )
-                try:
-                    config.provider.create_branch(branch_name)
-                except CalledProcessError as e:
-                    print(
-                        f'Failed to create branch' f' {branch_name}',
-                        file=stderr,
-                    )
-                    if e.stderr:
-                        print(e.stderr, file=stderr)
-                    return self.exit(1)
+                config.provider.create_branch(branch_name)
 
             changelog = join(root, 'CHANGELOG.md')
             with open(changelog) as fh:
@@ -211,15 +186,11 @@ class Bump:
             # If --pr is specified, stage, commit, push, and create PR
             if args.pr:
                 # Stage the specific files we modified
-                try:
-                    config.provider.add_file(changelog)
-                    config.provider.add_file(init)
-                    for entry in entries:
-                        if entry.filename:
-                            config.provider.add_file(entry.filename)
-                except CalledProcessError:
-                    print('Failed to stage changes', file=stderr)
-                    return self.exit(1)
+                config.provider.add_file(changelog)
+                config.provider.add_file(init)
+                for entry in entries:
+                    if entry.filename:
+                        config.provider.add_file(entry.filename)
 
                 # Commit changes
                 commit_message = (
@@ -228,32 +199,13 @@ class Bump:
                     f'.{new_version.patch}'
                     f' bump & changelog update'
                 )
-                try:
-                    config.provider.commit(commit_message)
-                except CalledProcessError as e:
-                    print('Failed to commit changes', file=stderr)
-                    if e.stderr:
-                        print(e.stderr, file=stderr)
-                    return self.exit(1)
+                config.provider.commit(commit_message)
 
                 # Push to origin
-                try:
-                    config.provider.push_branch(branch_name)
-                except CalledProcessError as e:
-                    print('Failed to push branch', file=stderr)
-                    if e.stderr:
-                        print(e.stderr, file=stderr)
-                    return self.exit(1)
+                config.provider.push_branch(branch_name)
 
                 # Create PR
-                try:
-                    url = config.provider.create_pr(commit_message, buf)
-                except CalledProcessError as e:
-                    print('Failed to create PR', file=stderr)
-                    if e.stderr:
-                        print(e.stderr, file=stderr)
-                    return self.exit(1)
-
+                url = config.provider.create_pr(commit_message, buf)
                 print(url)
 
         return new_version, buf
