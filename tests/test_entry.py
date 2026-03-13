@@ -156,6 +156,21 @@ class TestEntry(TestCase):
             self.assertEqual(entry.filename, loaded.filename)
             self.assertIsNone(loaded.pr)
 
+    def test_load_file_description_with_horizontal_rule(self):
+        with TemporaryDirectory() as td:
+            description = 'Before horizontal rule\n---\nAfter horizontal rule'
+            directory = join(td.dirname, '.changelog')
+            filename = join(directory, 'hr-entry.md')
+            makedirs(directory)
+
+            entry = Entry(
+                type='patch', description=description, filename=filename
+            )
+            entry.save()
+
+            loaded = Entry.load_file(filename)
+            self.assertEqual(description, loaded.description)
+
     def test_load_all(self):
         provider = DummyProvider()
 
