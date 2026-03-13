@@ -87,8 +87,7 @@ class Bump:
             current_branch = config.provider.current_branch()
             if current_branch != 'main':
                 print(
-                    f'Error: Must be on main branch, currently'
-                    f' on {current_branch}',
+                    f'Error: Must be on main branch, currently on {current_branch}',
                     file=stderr,
                 )
                 return self.exit(1)
