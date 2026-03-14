@@ -85,9 +85,10 @@ class Bump:
         if args.pr:
             # Check we're on main branch
             current_branch = config.provider.current_branch()
-            if current_branch != 'main':
+            base_branch = config.provider.base_branch
+            if current_branch != base_branch:
                 print(
-                    f'Error: Must be on main branch, currently on {current_branch}',
+                    f'Error: Must be on {base_branch} branch, currently on {current_branch}',
                     file=stderr,
                 )
                 return self.exit(1)

@@ -63,6 +63,18 @@ class TestGitHubCli(TestCase):
         self.assertTrue('--limit=50' in args)
 
     @patch('changelet.github.run')
+    def test_cache_filling_cmd_params_base_branch(self, run_mock):
+        gh = GitHubCli(repo='org/repo', base_branch='master')
+
+        run_mock.return_value = self.ResultMock('[]')
+        self.assertEqual({}, gh.prs(root='', directory='.changelog'))
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertTrue('master' in args)
+        # main should not be in the args
+        self.assertFalse('main' in args)
+
+    @patch('changelet.github.run')
     def test_cache_filling_cmd_params(self, run_mock):
         gh = GitHubCli(max_lookback=75, repo='org/repo')
 
@@ -136,6 +148,16 @@ class TestGitHubCli(TestCase):
         pr = gh.prs(root='', directory='.changelog')['43']
         self.assertEqual('43', pr.id)
         run_mock.assert_not_called()
+
+    @patch('changelet.github.run')
+    def test_changelog_entries_in_branch_base_branch(self, run_mock):
+        gh = GitHubCli(base_branch='develop')
+
+        run_mock.return_value = self.ResultMock(b'.foobar/blip.md')
+        gh.changelog_entries_in_branch(root='', directory='.foobar')
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'diff', '--name-only', 'origin/develop'], args)
 
     @patch('changelet.github.run')
     def test_changelog_entries_in_branch(self, run_mock):

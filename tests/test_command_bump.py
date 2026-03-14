@@ -365,6 +365,7 @@ class TestCommandBumpPR(TestCase):
     def _provider_mock(self, **overrides):
         provider = MagicMock()
         provider.current_branch.return_value = 'main'
+        provider.base_branch = 'main'
         provider.has_local_changes.return_value = False
         provider.create_pr.return_value = 'https://github.com/test/repo/pull/1'
         for k, v in overrides.items():
@@ -372,7 +373,7 @@ class TestCommandBumpPR(TestCase):
         return provider
 
     @patch('changelet.command.bump.Bump.exit')
-    def test_pr_not_on_main(self, exit_mock):
+    def test_pr_not_on_base_branch(self, exit_mock):
         cmd = Bump()
         config = Config('.cl', provider=None)
         config._provider = self._provider_mock(
@@ -385,6 +386,20 @@ class TestCommandBumpPR(TestCase):
         self.assertIsNone(result)
         exit_mock.assert_called_once_with(1)
         config.provider.current_branch.assert_called_once()
+
+    @patch('changelet.command.bump.Bump.exit')
+    def test_pr_not_on_custom_base_branch(self, exit_mock):
+        cmd = Bump()
+        config = Config('.cl', provider=None)
+        config._provider = self._provider_mock(
+            base_branch='develop', current_branch=MagicMock(return_value='main')
+        )
+
+        exit_mock.return_value = None
+
+        result = cmd.run(args=self.MockArgs([], pr=True), config=config)
+        self.assertIsNone(result)
+        exit_mock.assert_called_once_with(1)
 
     @patch('changelet.command.bump.Bump.exit')
     def test_pr_with_unstaged_changes(self, exit_mock):
