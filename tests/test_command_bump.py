@@ -8,7 +8,7 @@ from os import makedirs
 from os.path import basename, join
 from sys import path, version_info
 from unittest import TestCase
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 from helpers import AssertActionMixin, TemporaryDirectory
 from semver import Version
@@ -362,122 +362,49 @@ class TestCommandBumpPR(TestCase):
             self.pr = pr
             self.ignore_local_changes = ignore_local_changes
 
-    @patch('changelet.command.bump.run')
+    def _provider_mock(self, **overrides):
+        provider = MagicMock()
+        provider.current_branch.return_value = 'main'
+        provider.has_local_changes.return_value = False
+        provider.create_pr.return_value = 'https://github.com/test/repo/pull/1'
+        for k, v in overrides.items():
+            setattr(provider, k, v)
+        return provider
+
     @patch('changelet.command.bump.Bump.exit')
-    def test_pr_not_on_main(self, exit_mock, run_mock):
+    def test_pr_not_on_main(self, exit_mock):
         cmd = Bump()
         config = Config('.cl', provider=None)
-
-        # Mock git branch --show-current to return 'feature-branch'
-        run_mock.return_value.returncode = 0
-        run_mock.return_value.stdout = 'feature-branch\n'
-
-        exit_mock.return_value = None
-
-        result = cmd.run(args=self.MockArgs([], pr=True), config=config)
-        self.assertIsNone(result)
-        exit_mock.assert_called_once_with(1)
-        run_mock.assert_called_once_with(
-            ['git', 'branch', '--show-current'], capture_output=True, text=True
+        config._provider = self._provider_mock(
+            current_branch=MagicMock(return_value='feature-branch')
         )
 
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    def test_pr_with_unstaged_changes(self, exit_mock, run_mock):
-        cmd = Bump()
-        config = Config('.cl', provider=None)
-
         exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.stdout = ' M some_file.py\n'
-            return result
-
-        run_mock.side_effect = run_side_effect
 
         result = cmd.run(args=self.MockArgs([], pr=True), config=config)
         self.assertIsNone(result)
         exit_mock.assert_called_once_with(1)
+        config.provider.current_branch.assert_called_once()
 
-    @patch('changelet.command.bump.run')
     @patch('changelet.command.bump.Bump.exit')
-    def test_pr_git_branch_fails(self, exit_mock, run_mock):
+    def test_pr_with_unstaged_changes(self, exit_mock):
         cmd = Bump()
         config = Config('.cl', provider=None)
+        config._provider = self._provider_mock(
+            has_local_changes=MagicMock(return_value=True)
+        )
 
         exit_mock.return_value = None
-
-        # Mock git branch command failure
-        run_mock.return_value.returncode = 1
-
-        result = cmd.run(args=self.MockArgs([], pr=True), config=config)
-        self.assertIsNone(result)
-        exit_mock.assert_called_once_with(1)
-
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    def test_pr_git_status_fails(self, exit_mock, run_mock):
-        cmd = Bump()
-        config = Config('.cl', provider=None)
-
-        exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.returncode = 0
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.returncode = 1
-            return result
-
-        run_mock.side_effect = run_side_effect
-
-        result = cmd.run(args=self.MockArgs([], pr=True), config=config)
-        self.assertIsNone(result)
-        exit_mock.assert_called_once_with(1)
-
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    def test_pr_git_pull_fails(self, exit_mock, run_mock):
-        cmd = Bump()
-        config = Config('.cl', provider=None)
-
-        exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.returncode = 0
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.returncode = 0
-                result.stdout = ''
-            elif cmd_args == ['git', 'pull']:
-                result.returncode = 1
-                result.stderr = 'Pull failed'
-            return result
-
-        run_mock.side_effect = run_side_effect
 
         result = cmd.run(args=self.MockArgs([], pr=True), config=config)
         self.assertIsNone(result)
         exit_mock.assert_called_once_with(1)
 
     @patch('changelet.entry.remove')
-    @patch('changelet.command.bump.run')
     @patch('changelet.command.bump.Bump.exit')
     @patch('changelet.entry.Entry.load_all')
     @patch('changelet.command.bump._get_current_version')
-    def test_pr_success(self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock):
+    def test_pr_success(self, gcv_mock, ela_mock, exit_mock, rm_mock):
         cmd = Bump()
 
         gcv_mock.return_value = Version.parse('0.1.3')
@@ -492,26 +419,12 @@ class TestCommandBumpPR(TestCase):
                     url='http://1',
                     merged_at=now - timedelta(days=1),
                 ),
-            )
+            ),
+            # entry without a filename (no file to stage)
+            Entry(type='minor', description='change 2'),
         ]
 
         exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            result.stdout = ''
-            result.stderr = ''
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.stdout = ''
-            elif cmd_args[0:2] == ['gh', 'pr']:
-                result.stdout = 'https://github.com/test/repo/pull/1\n'
-            return result
-
-        run_mock.side_effect = run_side_effect
 
         with TemporaryDirectory() as td:
             changelog = join(td.dirname, 'CHANGELOG.md')
@@ -525,10 +438,13 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            provider_mock = self._provider_mock()
+            config._provider = provider_mock
 
-            # give our entries filenames
-            for i, entry in enumerate(ela_mock.return_value):
-                entry.filename = join(config.directory, f'ela-{i:04d}.md')
+            # give only the first entry a filename
+            ela_mock.return_value[0].filename = join(
+                config.directory, 'ela-0000.md'
+            )
 
             new_version, buf = cmd.run(
                 self.MockArgs([], pr=True), config=config, root=td.dirname
@@ -536,352 +452,36 @@ class TestCommandBumpPR(TestCase):
 
             self.assertEqual('0.2.0', new_version)
 
-            # Verify all git commands were called
-            calls = run_mock.call_args_list
+            # Verify provider calls
+            provider_mock.current_branch.assert_called_once()
+            provider_mock.has_local_changes.assert_called_once()
+            provider_mock.pull.assert_called_once()
+            provider_mock.create_branch.assert_called_once_with('rel-0-2-0')
+
+            # Verify provider.add_file was called for changelog, init,
+            # and only the entry with a filename
+            add_calls = provider_mock.add_file.call_args_list
+            self.assertEqual(3, len(add_calls))
+            self.assertEqual(changelog, add_calls[0][0][0])
+            self.assertEqual(init, add_calls[1][0][0])
             self.assertEqual(
-                ['git', 'branch', '--show-current'], calls[0][0][0]
+                join(config.directory, 'ela-0000.md'), add_calls[2][0][0]
             )
-            self.assertEqual(['git', 'status', '--porcelain'], calls[1][0][0])
-            self.assertEqual(['git', 'pull'], calls[2][0][0])
-            self.assertEqual(
-                ['git', 'checkout', '-b', 'rel-0-2-0'], calls[3][0][0]
+
+            provider_mock.commit.assert_called_once_with(
+                'Version 0.2.0 bump & changelog update'
             )
-            self.assertEqual(['git', 'add', '-p'], calls[4][0][0])
-            self.assertEqual(['git', 'commit', '-m'], calls[5][0][0][:3])
-            self.assertEqual(
-                'Version 0.2.0 bump & changelog update', calls[5][0][0][3]
+            provider_mock.push_branch.assert_called_once_with('rel-0-2-0')
+            provider_mock.create_pr.assert_called_once_with(
+                'Version 0.2.0 bump & changelog update', buf
             )
-            self.assertEqual(
-                ['git', 'push', '-u', 'origin', 'rel-0-2-0'], calls[6][0][0]
-            )
-            self.assertEqual(['gh', 'pr', 'create'], calls[7][0][0][:3])
 
     @patch('changelet.entry.remove')
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    @patch('changelet.entry.Entry.load_all')
-    @patch('changelet.command.bump._get_current_version')
-    def test_pr_create_branch_fails(
-        self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
-    ):
-        cmd = Bump()
-
-        gcv_mock.return_value = Version.parse('0.1.3')
-        now = datetime.now().replace(tzinfo=timezone.utc)
-        ela_mock.return_value = [
-            Entry(
-                type='minor',
-                description='change 1',
-                pr=Pr(
-                    id=1,
-                    text='text 1',
-                    url='http://1',
-                    merged_at=now - timedelta(days=1),
-                ),
-            )
-        ]
-
-        exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            result.stdout = ''
-            result.stderr = ''
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.stdout = ''
-            elif cmd_args[0:3] == ['git', 'checkout', '-b']:
-                result.returncode = 1
-                result.stderr = 'Branch exists'
-            return result
-
-        run_mock.side_effect = run_side_effect
-
-        with TemporaryDirectory() as td:
-            changelog = join(td.dirname, 'CHANGELOG.md')
-            with open(changelog, 'w') as fh:
-                fh.write('fin')
-
-            init = join(td.dirname, basename(td.dirname))
-            makedirs(init)
-            init = join(init, '__init__.py')
-            with open(init, 'w') as fh:
-                fh.write("# __version__ = '0.1.3' #")
-
-            config = Config(join(td.dirname, '.cl'), provider=None)
-
-            result = cmd.run(
-                self.MockArgs([], pr=True), config=config, root=td.dirname
-            )
-
-            self.assertIsNone(result)
-            exit_mock.assert_called_with(1)
-
-    @patch('changelet.entry.remove')
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    @patch('changelet.entry.Entry.load_all')
-    @patch('changelet.command.bump._get_current_version')
-    def test_pr_git_add_fails(
-        self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
-    ):
-        cmd = Bump()
-
-        gcv_mock.return_value = Version.parse('0.1.3')
-        now = datetime.now().replace(tzinfo=timezone.utc)
-        ela_mock.return_value = [
-            Entry(
-                type='minor',
-                description='change 1',
-                pr=Pr(
-                    id=1,
-                    text='text 1',
-                    url='http://1',
-                    merged_at=now - timedelta(days=1),
-                ),
-            )
-        ]
-
-        exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            result.stdout = ''
-            result.stderr = ''
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.stdout = ''
-            elif cmd_args == ['git', 'add', '-p']:
-                result.returncode = 1
-            return result
-
-        run_mock.side_effect = run_side_effect
-
-        with TemporaryDirectory() as td:
-            changelog = join(td.dirname, 'CHANGELOG.md')
-            with open(changelog, 'w') as fh:
-                fh.write('fin')
-
-            init = join(td.dirname, basename(td.dirname))
-            makedirs(init)
-            init = join(init, '__init__.py')
-            with open(init, 'w') as fh:
-                fh.write("# __version__ = '0.1.3' #")
-
-            config = Config(join(td.dirname, '.cl'), provider=None)
-
-            result = cmd.run(
-                self.MockArgs([], pr=True), config=config, root=td.dirname
-            )
-
-            self.assertIsNone(result)
-            exit_mock.assert_called_with(1)
-
-    @patch('changelet.entry.remove')
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    @patch('changelet.entry.Entry.load_all')
-    @patch('changelet.command.bump._get_current_version')
-    def test_pr_git_commit_fails(
-        self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
-    ):
-        cmd = Bump()
-
-        gcv_mock.return_value = Version.parse('0.1.3')
-        now = datetime.now().replace(tzinfo=timezone.utc)
-        ela_mock.return_value = [
-            Entry(
-                type='minor',
-                description='change 1',
-                pr=Pr(
-                    id=1,
-                    text='text 1',
-                    url='http://1',
-                    merged_at=now - timedelta(days=1),
-                ),
-            )
-        ]
-
-        exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            result.stdout = ''
-            result.stderr = ''
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.stdout = ''
-            elif cmd_args[:2] == ['git', 'commit']:
-                result.returncode = 1
-                result.stderr = 'Commit failed'
-            return result
-
-        run_mock.side_effect = run_side_effect
-
-        with TemporaryDirectory() as td:
-            changelog = join(td.dirname, 'CHANGELOG.md')
-            with open(changelog, 'w') as fh:
-                fh.write('fin')
-
-            init = join(td.dirname, basename(td.dirname))
-            makedirs(init)
-            init = join(init, '__init__.py')
-            with open(init, 'w') as fh:
-                fh.write("# __version__ = '0.1.3' #")
-
-            config = Config(join(td.dirname, '.cl'), provider=None)
-
-            result = cmd.run(
-                self.MockArgs([], pr=True), config=config, root=td.dirname
-            )
-
-            self.assertIsNone(result)
-            exit_mock.assert_called_with(1)
-
-    @patch('changelet.entry.remove')
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    @patch('changelet.entry.Entry.load_all')
-    @patch('changelet.command.bump._get_current_version')
-    def test_pr_git_push_fails(
-        self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
-    ):
-        cmd = Bump()
-
-        gcv_mock.return_value = Version.parse('0.1.3')
-        now = datetime.now().replace(tzinfo=timezone.utc)
-        ela_mock.return_value = [
-            Entry(
-                type='minor',
-                description='change 1',
-                pr=Pr(
-                    id=1,
-                    text='text 1',
-                    url='http://1',
-                    merged_at=now - timedelta(days=1),
-                ),
-            )
-        ]
-
-        exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            result.stdout = ''
-            result.stderr = ''
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.stdout = ''
-            elif cmd_args[:2] == ['git', 'push']:
-                result.returncode = 1
-                result.stderr = 'Push failed'
-            return result
-
-        run_mock.side_effect = run_side_effect
-
-        with TemporaryDirectory() as td:
-            changelog = join(td.dirname, 'CHANGELOG.md')
-            with open(changelog, 'w') as fh:
-                fh.write('fin')
-
-            init = join(td.dirname, basename(td.dirname))
-            makedirs(init)
-            init = join(init, '__init__.py')
-            with open(init, 'w') as fh:
-                fh.write("# __version__ = '0.1.3' #")
-
-            config = Config(join(td.dirname, '.cl'), provider=None)
-
-            result = cmd.run(
-                self.MockArgs([], pr=True), config=config, root=td.dirname
-            )
-
-            self.assertIsNone(result)
-            exit_mock.assert_called_with(1)
-
-    @patch('changelet.entry.remove')
-    @patch('changelet.command.bump.run')
-    @patch('changelet.command.bump.Bump.exit')
-    @patch('changelet.entry.Entry.load_all')
-    @patch('changelet.command.bump._get_current_version')
-    def test_pr_gh_create_fails(
-        self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
-    ):
-        cmd = Bump()
-
-        gcv_mock.return_value = Version.parse('0.1.3')
-        now = datetime.now().replace(tzinfo=timezone.utc)
-        ela_mock.return_value = [
-            Entry(
-                type='minor',
-                description='change 1',
-                pr=Pr(
-                    id=1,
-                    text='text 1',
-                    url='http://1',
-                    merged_at=now - timedelta(days=1),
-                ),
-            )
-        ]
-
-        exit_mock.return_value = None
-
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            result.stdout = ''
-            result.stderr = ''
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                result.stdout = ''
-            elif cmd_args[:2] == ['gh', 'pr']:
-                result.returncode = 1
-                result.stderr = 'PR creation failed'
-            return result
-
-        run_mock.side_effect = run_side_effect
-
-        with TemporaryDirectory() as td:
-            changelog = join(td.dirname, 'CHANGELOG.md')
-            with open(changelog, 'w') as fh:
-                fh.write('fin')
-
-            init = join(td.dirname, basename(td.dirname))
-            makedirs(init)
-            init = join(init, '__init__.py')
-            with open(init, 'w') as fh:
-                fh.write("# __version__ = '0.1.3' #")
-
-            config = Config(join(td.dirname, '.cl'), provider=None)
-
-            result = cmd.run(
-                self.MockArgs([], pr=True), config=config, root=td.dirname
-            )
-
-            self.assertIsNone(result)
-            exit_mock.assert_called_with(1)
-
-    @patch('changelet.entry.remove')
-    @patch('changelet.command.bump.run')
     @patch('changelet.command.bump.Bump.exit')
     @patch('changelet.entry.Entry.load_all')
     @patch('changelet.command.bump._get_current_version')
     def test_pr_ignore_local_changes(
-        self, gcv_mock, ela_mock, exit_mock, run_mock, rm_mock
+        self, gcv_mock, ela_mock, exit_mock, rm_mock
     ):
         cmd = Bump()
 
@@ -902,25 +502,6 @@ class TestCommandBumpPR(TestCase):
 
         exit_mock.return_value = None
 
-        # Mock responses for git commands
-        def run_side_effect(cmd_args, **kwargs):
-            result = type('obj', (object,), {})()
-            result.returncode = 0
-            result.stdout = ''
-            result.stderr = ''
-            if cmd_args == ['git', 'branch', '--show-current']:
-                result.stdout = 'main\n'
-            elif cmd_args == ['git', 'status', '--porcelain']:
-                # Should not be called when ignore_local_changes is True
-                raise AssertionError(
-                    'git status should not be called with --ignore-local-changes'
-                )
-            elif cmd_args[0:2] == ['gh', 'pr']:
-                result.stdout = 'https://github.com/test/repo/pull/1\n'
-            return result
-
-        run_mock.side_effect = run_side_effect
-
         with TemporaryDirectory() as td:
             changelog = join(td.dirname, 'CHANGELOG.md')
             with open(changelog, 'w') as fh:
@@ -933,6 +514,8 @@ class TestCommandBumpPR(TestCase):
                 fh.write("# __version__ = '0.1.3' #")
 
             config = Config(join(td.dirname, '.cl'), provider=None)
+            provider_mock = self._provider_mock()
+            config._provider = provider_mock
 
             # give our entries filenames
             for i, entry in enumerate(ela_mock.return_value):
@@ -946,9 +529,5 @@ class TestCommandBumpPR(TestCase):
 
             self.assertEqual('0.2.0', new_version)
 
-            # Verify git status --porcelain was NOT called
-            calls = run_mock.call_args_list
-            status_calls = [
-                c for c in calls if c[0][0] == ['git', 'status', '--porcelain']
-            ]
-            self.assertEqual(0, len(status_calls))
+            # Verify has_local_changes was NOT called
+            provider_mock.has_local_changes.assert_not_called()

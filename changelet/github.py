@@ -137,5 +137,61 @@ class GitHubCli:
             cmd[2:2] = shlex_split(extra_args)
         run(cmd, check=True)
 
+    def current_branch(self):
+        result = run(
+            ['git', 'branch', '--show-current'],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    def has_local_changes(self):
+        result = run(
+            ['git', 'status', '--porcelain'],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return bool(result.stdout.strip())
+
+    def pull(self):
+        run(['git', 'pull'], check=True, capture_output=True, text=True)
+
+    def create_branch(self, name):
+        run(
+            ['git', 'checkout', '-b', name],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    def push_branch(self, name):
+        run(
+            ['git', 'push', '-u', 'origin', name],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    def create_pr(self, title, body):
+        result = run(
+            [
+                'gh',
+                'pr',
+                'create',
+                '--title',
+                title,
+                '--body',
+                body,
+                '--assignee',
+                '@me',
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
     def __repr__(self):
         return f'GitHubCli<repo={self.repo}, max_lookback={self.max_lookback}>'

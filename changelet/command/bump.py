@@ -6,7 +6,6 @@ from datetime import datetime
 from importlib import import_module
 from io import StringIO
 from os.path import abspath, basename, join
-from subprocess import run
 from sys import exit, path, stderr
 
 from semver import Version
@@ -85,15 +84,7 @@ class Bump:
         # If --pr is specified, validate git state and handle PR workflow
         if args.pr:
             # Check we're on main branch
-            result = run(
-                ['git', 'branch', '--show-current'],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                print('Failed to get current branch', file=stderr)
-                return self.exit(1)
-            current_branch = result.stdout.strip()
+            current_branch = config.provider.current_branch()
             if current_branch != 'main':
                 print(
                     f'Error: Must be on main branch, currently on {current_branch}',
@@ -103,15 +94,7 @@ class Bump:
 
             # Check for unstaged changes (unless --ignore-local-changes is set)
             if not args.ignore_local_changes:
-                result = run(
-                    ['git', 'status', '--porcelain'],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
-                    print('Failed to check git status', file=stderr)
-                    return self.exit(1)
-                if result.stdout.strip():
+                if config.provider.has_local_changes():
                     print(
                         'Error: Unstaged changes detected. Please commit or stash them.',
                         file=stderr,
@@ -119,11 +102,7 @@ class Bump:
                     return self.exit(1)
 
             # Pull latest changes
-            result = run(['git', 'pull'], capture_output=True, text=True)
-            if result.returncode != 0:
-                print('Failed to pull latest changes', file=stderr)
-                print(result.stderr, file=stderr)
-                return self.exit(1)
+            config.provider.pull()
 
         buf = StringIO()
 
@@ -174,17 +153,9 @@ class Bump:
             self.exit(0)
         else:
             # If --pr is specified, create branch and make changes
+            branch_name = f'rel-{new_version.major}-{new_version.minor}-{new_version.patch}'
             if args.pr:
-                branch_name = f'rel-{new_version.major}-{new_version.minor}-{new_version.patch}'
-                result = run(
-                    ['git', 'checkout', '-b', branch_name],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
-                    print(f'Failed to create branch {branch_name}', file=stderr)
-                    print(result.stderr, file=stderr)
-                    return self.exit(1)
+                config.provider.create_branch(branch_name)
 
             changelog = join(root, 'CHANGELOG.md')
             with open(changelog) as fh:
@@ -208,56 +179,22 @@ class Bump:
 
             # If --pr is specified, stage, commit, push, and create PR
             if args.pr:
-                # Stage changes interactively
-                result = run(['git', 'add', '-p'])
-                if result.returncode != 0:
-                    print('Failed to stage changes', file=stderr)
-                    return self.exit(1)
+                # Stage the specific files we modified
+                config.provider.add_file(changelog)
+                config.provider.add_file(init)
+                for entry in entries:
+                    if entry.filename:
+                        config.provider.add_file(entry.filename)
 
                 # Commit changes
                 commit_message = f'Version {new_version.major}.{new_version.minor}.{new_version.patch} bump & changelog update'
-                result = run(
-                    ['git', 'commit', '-m', commit_message],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
-                    print('Failed to commit changes', file=stderr)
-                    print(result.stderr, file=stderr)
-                    return self.exit(1)
+                config.provider.commit(commit_message)
 
                 # Push to origin
-                result = run(
-                    ['git', 'push', '-u', 'origin', branch_name],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
-                    print('Failed to push branch', file=stderr)
-                    print(result.stderr, file=stderr)
-                    return self.exit(1)
+                config.provider.push_branch(branch_name)
 
                 # Create PR
-                result = run(
-                    [
-                        'gh',
-                        'pr',
-                        'create',
-                        '--title',
-                        commit_message,
-                        '--body',
-                        buf,
-                        '--assignee',
-                        '@me',
-                    ],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
-                    print('Failed to create PR', file=stderr)
-                    print(result.stderr, file=stderr)
-                    return self.exit(1)
-
-                print(result.stdout)
+                url = config.provider.create_pr(commit_message, buf)
+                print(url)
 
         return new_version, buf

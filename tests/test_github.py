@@ -313,6 +313,85 @@ class TestGitHubCli(TestCase):
         args = run_mock.call_args[0][0]
         self.assertTrue(description in args)
 
+    @patch('changelet.github.run')
+    def test_current_branch(self, run_mock):
+        gh = GitHubCli()
+
+        run_mock.return_value = self.ResultMock('main\n')
+        self.assertEqual('main', gh.current_branch())
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'branch', '--show-current'], args)
+
+    @patch('changelet.github.run')
+    def test_has_local_changes(self, run_mock):
+        gh = GitHubCli()
+
+        # no changes
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock('')
+        self.assertFalse(gh.has_local_changes())
+        run_mock.assert_called_once()
+
+        # has changes
+        run_mock.reset_mock()
+        run_mock.return_value = self.ResultMock(' M foo.py\n')
+        self.assertTrue(gh.has_local_changes())
+        run_mock.assert_called_once()
+
+    @patch('changelet.github.run')
+    def test_pull(self, run_mock):
+        gh = GitHubCli()
+
+        gh.pull()
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'pull'], args)
+
+    @patch('changelet.github.run')
+    def test_create_branch(self, run_mock):
+        gh = GitHubCli()
+
+        gh.create_branch('my-branch')
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'checkout', '-b', 'my-branch'], args)
+
+    @patch('changelet.github.run')
+    def test_push_branch(self, run_mock):
+        gh = GitHubCli()
+
+        gh.push_branch('my-branch')
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(['git', 'push', '-u', 'origin', 'my-branch'], args)
+
+    @patch('changelet.github.run')
+    def test_create_pr(self, run_mock):
+        gh = GitHubCli()
+
+        run_mock.return_value = self.ResultMock(
+            'https://github.com/org/repo/pull/1\n'
+        )
+        url = gh.create_pr('My Title', 'My Body')
+        self.assertEqual('https://github.com/org/repo/pull/1', url)
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        self.assertEqual(
+            [
+                'gh',
+                'pr',
+                'create',
+                '--title',
+                'My Title',
+                '--body',
+                'My Body',
+                '--assignee',
+                '@me',
+            ],
+            args,
+        )
+
     @patch('changelet.github.environ')
     @patch('changelet.github.run')
     def test_commit_with_extra_args(self, run_mock, environ_mock):
