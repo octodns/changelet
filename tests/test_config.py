@@ -25,6 +25,7 @@ class TestConfig(TestCase):
         self.assertEqual('', config.root)
         self.assertEqual('.changelog', config.directory)
         self.assertEqual('Changelog: ', config.commit_prefix)
+        self.assertIsNone(config.module)
         self.assertEqual(
             {'class': 'changelet.github.GitHubCli'}, config._provider_config
         )
@@ -38,12 +39,32 @@ class TestConfig(TestCase):
             root='.foo',
             directory='.bar',
             commit_prefix='abc: ',
+            module='custom_mod',
             provider={'class': klass},
         )
         self.assertEqual('.foo', config.root)
         self.assertEqual('.bar', config.directory)
         self.assertEqual('abc: ', config.commit_prefix)
+        self.assertEqual('custom_mod', config.module)
         self.assertIsInstance(config.provider, self.DummyProvider)
+
+    def test_module(self):
+        # explicit value
+        config = Config(module='my_module')
+        self.assertEqual('my_module', config.module)
+
+        # None when not set (build() handles the fallback)
+        config = Config()
+        self.assertIsNone(config.module)
+
+        # setattr works for config file loading
+        config = Config()
+        config.module = 'from_config'
+        self.assertEqual('from_config', config.module)
+
+        # build() fills in the default from cwd basename
+        config = Config.build(root='doesnt-exist')
+        self.assertEqual('changelet', config.module)
 
     def test_provider(self):
         config = Config(provider={'class': self.DummyProvider})
@@ -78,6 +99,7 @@ key = "value"
                 fh.write('''[tool.changelet]
 root = "blip"
 directory = ".location"
+module = "custom_mod"
 provider.class = "changelet.github.GitHubCli"
 provider.repo = "org/repo"
 ''')
@@ -85,6 +107,7 @@ provider.repo = "org/repo"
             config.load_pyproject_toml(filename)
             self.assertEqual('blip', config.root)
             self.assertEqual('.location', config.directory)
+            self.assertEqual('custom_mod', config.module)
             self.assertIsInstance(config.provider, GitHubCli)
             self.assertEqual('org/repo', config.provider.repo)
 
@@ -107,6 +130,7 @@ provider.repo = "org/repo"
                 fh.write('''---
 root: blip
 directory: .location
+module: custom_mod
 provider:
     class: changelet.github.GitHubCli
     repo: org/repo
@@ -115,6 +139,7 @@ provider:
             config.load_yaml(filename)
             self.assertEqual('blip', config.root)
             self.assertEqual('.location', config.directory)
+            self.assertEqual('custom_mod', config.module)
             self.assertIsInstance(config.provider, GitHubCli)
             self.assertEqual('org/repo', config.provider.repo)
 
@@ -166,3 +191,7 @@ directory: from_yaml
             # matches the root we passed in so that it'd fine the pyproject.toml
             self.assertEqual(td.dirname, config.root)
             self.assertEqual('from_kwargs', config.directory)
+
+            # module override from kwargs
+            config = Config.build(root=td.dirname, module='from_kwargs_mod')
+            self.assertEqual('from_kwargs_mod', config.module)

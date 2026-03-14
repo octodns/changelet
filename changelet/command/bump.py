@@ -5,7 +5,7 @@
 from datetime import datetime
 from importlib import import_module
 from io import StringIO
-from os.path import abspath, basename, join
+from os.path import join
 from sys import exit, path, stderr
 
 from semver import Version
@@ -107,7 +107,7 @@ class Bump:
 
         buf = StringIO()
 
-        module_name = basename(abspath(root)).replace('-', '_')
+        module_name = config.module
 
         buf.write('## ')
         current_version = _get_current_version(module_name)

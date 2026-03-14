@@ -28,6 +28,12 @@ def main(argv=sys_argv, exit_on_error=True):
         default=None,
     )
     parser.add_argument(
+        '-m',
+        '--module',
+        help='The Python module name, Default: derived from directory name',
+        default=None,
+    )
+    parser.add_argument(
         '-l',
         '--logging',
         help='Logging level, Default: NONE',
@@ -56,6 +62,8 @@ def main(argv=sys_argv, exit_on_error=True):
         kwargs['root'] = args.root
     if args.directory:
         kwargs['directory'] = args.directory
+    if args.module:
+        kwargs['module'] = args.module
     config = Config.build(**kwargs)
     try:
         command = commands[args.command]
