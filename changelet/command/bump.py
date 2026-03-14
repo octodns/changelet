@@ -96,8 +96,7 @@ class Bump:
             if not args.ignore_local_changes:
                 if config.provider.has_local_changes():
                     print(
-                        'Error: Unstaged changes detected.'
-                        ' Please commit or stash them.',
+                        'Error: Unstaged changes detected. Please commit or stash them.',
                         file=stderr,
                     )
                     return self.exit(1)
@@ -154,12 +153,8 @@ class Bump:
             self.exit(0)
         else:
             # If --pr is specified, create branch and make changes
+            branch_name = f'rel-{new_version.major}-{new_version.minor}-{new_version.patch}'
             if args.pr:
-                branch_name = (
-                    f'rel-{new_version.major}'
-                    f'-{new_version.minor}'
-                    f'-{new_version.patch}'
-                )
                 config.provider.create_branch(branch_name)
 
             changelog = join(root, 'CHANGELOG.md')
@@ -192,12 +187,7 @@ class Bump:
                         config.provider.add_file(entry.filename)
 
                 # Commit changes
-                commit_message = (
-                    f'Version {new_version.major}'
-                    f'.{new_version.minor}'
-                    f'.{new_version.patch}'
-                    f' bump & changelog update'
-                )
+                commit_message = f'Version {new_version.major}.{new_version.minor}.{new_version.patch} bump & changelog update'
                 config.provider.commit(commit_message)
 
                 # Push to origin
