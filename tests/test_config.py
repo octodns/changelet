@@ -25,7 +25,7 @@ class TestConfig(TestCase):
         self.assertEqual('', config.root)
         self.assertEqual('.changelog', config.directory)
         self.assertEqual('Changelog: ', config.commit_prefix)
-        self.assertIsNone(config._module)
+        self.assertIsNone(config.module)
         self.assertEqual(
             {'class': 'changelet.github.GitHubCli'}, config._provider_config
         )
@@ -53,16 +53,18 @@ class TestConfig(TestCase):
         config = Config(module='my_module')
         self.assertEqual('my_module', config.module)
 
-        # derived from cwd when not set
+        # None when not set (build() handles the fallback)
         config = Config()
-        self.assertIsNone(config._module)
-        # module property derives from cwd basename
-        self.assertEqual('changelet', config.module)
+        self.assertIsNone(config.module)
 
-        # setter works for config file loading (setattr)
+        # setattr works for config file loading
         config = Config()
         config.module = 'from_config'
         self.assertEqual('from_config', config.module)
+
+        # build() fills in the default from cwd basename
+        config = Config.build(root='doesnt-exist')
+        self.assertEqual('changelet', config.module)
 
     def test_provider(self):
         config = Config(provider={'class': self.DummyProvider})

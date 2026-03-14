@@ -64,6 +64,10 @@ class Config:
         except KeyError:
             pass
 
+        # default module from cwd basename if not set by config or cli
+        if config.module is None:
+            config.module = basename(abspath('.')).replace('-', '_')
+
         return config
 
     def __init__(
@@ -81,16 +85,6 @@ class Config:
 
         # will instantiate & configure
         self.provider = provider
-
-    @property
-    def module(self):
-        if self._module is not None:
-            return self._module
-        return basename(abspath('.')).replace('-', '_')
-
-    @module.setter
-    def module(self, value):
-        self._module = value
 
     @property
     def provider(self):
