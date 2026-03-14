@@ -472,7 +472,9 @@ class TestCommandBumpPR(TestCase):
                 'Version 0.2.0 bump & changelog update'
             )
             provider_mock.push_branch.assert_called_once_with('rel-0-2-0')
-            provider_mock.create_pr.assert_called_once()
+            provider_mock.create_pr.assert_called_once_with(
+                'Version 0.2.0 bump & changelog update', buf
+            )
 
     @patch('changelet.entry.remove')
     @patch('changelet.command.bump.Bump.exit')
