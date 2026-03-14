@@ -1,3 +1,22 @@
+## 0.5.0 - 2026-03-14
+
+Minor:
+* Make module name configurable via Config instead of deriving from directory name in bump - [#44](https://github.com/octodns/changelet/pull/44)
+* Make base branch configurable in GitHubCli provider instead of hardcoding main - [#43](https://github.com/octodns/changelet/pull/43)
+* Migrate bump command subprocess calls to provider - [#42](https://github.com/octodns/changelet/pull/42)
+* Replace interactive git add -p with explicit file staging - [#42](https://github.com/octodns/changelet/pull/42)
+* Add --continue support - [#32](https://github.com/octodns/changelet/pull/32)
+* Add support for CHANGELET_GIT_ADD_ARGS and CHANGELET_GIT_COMMIT_ARGS environment variables to pass additional arguments to git commands - [#28](https://github.com/octodns/changelet/pull/28)
+
+Patch:
+* Remove misleading None default from Config.load_yaml filename parameter - [#41](https://github.com/octodns/changelet/pull/41)
+* Wire up EntryType enum for type validation - [#40](https://github.com/octodns/changelet/pull/40)
+* Limit _parse_file split to preserve --- in descriptions - [#39](https://github.com/octodns/changelet/pull/39)
+* Restore sys.path after _get_current_version import - [#38](https://github.com/octodns/changelet/pull/38)
+* Add trailing newline when saving changelog entry files - [#35](https://github.com/octodns/changelet/pull/35)
+* Fix startswith(directory) path prefix matching to avoid false matches on similarly named directories - [#34](https://github.com/octodns/changelet/pull/34)
+* Fix has_staged check in create --commit to run before staging the entry - [#33](https://github.com/octodns/changelet/pull/33)
+
 ## 0.4.0 - 2025-11-26
 
 Minor:
