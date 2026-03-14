@@ -15,11 +15,17 @@ from .pr import Pr
 
 class GitHubCli:
 
-    def __init__(self, repo=None, max_lookback=50):
+    def __init__(self, repo=None, max_lookback=50, base_branch='main'):
         self.log = getLogger('GitHubCli[{repo}]')
-        self.log.info('__init__: repo=%s, max_lookback=%d', repo, max_lookback)
+        self.log.info(
+            '__init__: repo=%s, max_lookback=%d, base_branch=%s',
+            repo,
+            max_lookback,
+            base_branch,
+        )
         self.repo = repo
         self.max_lookback = max_lookback
+        self.base_branch = base_branch
 
         self._prs = None
 
@@ -39,7 +45,7 @@ class GitHubCli:
                 'pr',
                 'list',
                 '--base',
-                'main',
+                self.base_branch,
                 '--state',
                 'merged',
                 f'--limit={self.max_lookback}',
@@ -87,9 +93,8 @@ class GitHubCli:
         return self.prs(root=root, directory=directory).get(filename)
 
     def changelog_entries_in_branch(self, root, directory):
-        # TODO: automatically figure our main branch or configure it
         result = run(
-            ['git', 'diff', '--name-only', 'origin/main'],
+            ['git', 'diff', '--name-only', f'origin/{self.base_branch}'],
             check=False,
             stdout=PIPE,
         )
@@ -194,4 +199,4 @@ class GitHubCli:
         return result.stdout.strip()
 
     def __repr__(self):
-        return f'GitHubCli<repo={self.repo}, max_lookback={self.max_lookback}>'
+        return f'GitHubCli<repo={self.repo}, max_lookback={self.max_lookback}, base_branch={self.base_branch}>'
