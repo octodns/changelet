@@ -3,7 +3,7 @@
 #
 
 from importlib import import_module
-from os.path import isfile, join
+from os.path import abspath, basename, isfile, join
 from sys import version_info
 from typing import TYPE_CHECKING
 
@@ -58,6 +58,12 @@ class Config:
         except KeyError:
             pass
 
+        # override module w/command line arg, if applicable
+        try:
+            config.module = kwargs['module']
+        except KeyError:
+            pass
+
         return config
 
     def __init__(
@@ -65,14 +71,26 @@ class Config:
         root=DEFAULT_ROOT,
         directory='.changelog',
         commit_prefix='Changelog: ',
+        module=None,
         provider={'class': 'changelet.github.GitHubCli'},
     ):
         self.root = root
         self.directory = directory
         self.commit_prefix = commit_prefix
+        self.module = module
 
         # will instantiate & configure
         self.provider = provider
+
+    @property
+    def module(self):
+        if self._module is not None:
+            return self._module
+        return basename(abspath('.')).replace('-', '_')
+
+    @module.setter
+    def module(self, value):
+        self._module = value
 
     @property
     def provider(self):
@@ -106,4 +124,4 @@ class Config:
                     setattr(self, k, v)
 
     def __repr__(self):
-        return f'Config<root={self.root}, directory={self.directory}, provider={self.provider}>'
+        return f'Config<root={self.root}, directory={self.directory}, module={self.module}, provider={self.provider}>'

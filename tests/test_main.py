@@ -76,6 +76,15 @@ class TestMain(TestCase):
         exit_mock.assert_called_once()
         build_mock.assert_called_once_with(directory='directory-dir')
 
+    @patch('changelet.config.Config.build')
+    def test_arg_module(self, build_mock):
+        build_mock.return_value = Config()
+
+        with patch('changelet.command.check.exit') as exit_mock:
+            main(['e*e', '--module', 'my_module', 'check'], exit_on_error=False)
+        exit_mock.assert_called_once()
+        build_mock.assert_called_once_with(module='my_module')
+
     @patch('changelet.command.check.exit')
     def test_arg_logging(self, exit_mock):
         with patch('logging.basicConfig') as basicConfig_mock:

@@ -200,18 +200,21 @@ Patch:
 
         # make changes
         with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
 
             changelog = join(td.dirname, 'CHANGELOG.md')
             with open(changelog, 'w') as fh:
                 fh.write('fin')
 
-            init = join(td.dirname, basename(td.dirname))
+            init = join(td.dirname, module_name)
             makedirs(init)
             init = join(init, '__init__.py')
             with open(init, 'w') as fh:
                 fh.write("# __version__ = '0.1.3' #")
 
-            config = Config(join(td.dirname, '.cl'), provider=None)
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
 
             # no title
             expected = expected.replace(' - This is the title', '')
@@ -442,17 +445,21 @@ class TestCommandBumpPR(TestCase):
         exit_mock.return_value = None
 
         with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
             changelog = join(td.dirname, 'CHANGELOG.md')
             with open(changelog, 'w') as fh:
                 fh.write('fin')
 
-            init = join(td.dirname, basename(td.dirname))
+            init = join(td.dirname, module_name)
             makedirs(init)
             init = join(init, '__init__.py')
             with open(init, 'w') as fh:
                 fh.write("# __version__ = '0.1.3' #")
 
-            config = Config(join(td.dirname, '.cl'), provider=None)
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
             provider_mock = self._provider_mock()
             config._provider = provider_mock
 
@@ -518,17 +525,21 @@ class TestCommandBumpPR(TestCase):
         exit_mock.return_value = None
 
         with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
             changelog = join(td.dirname, 'CHANGELOG.md')
             with open(changelog, 'w') as fh:
                 fh.write('fin')
 
-            init = join(td.dirname, basename(td.dirname))
+            init = join(td.dirname, module_name)
             makedirs(init)
             init = join(init, '__init__.py')
             with open(init, 'w') as fh:
                 fh.write("# __version__ = '0.1.3' #")
 
-            config = Config(join(td.dirname, '.cl'), provider=None)
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
             provider_mock = self._provider_mock()
             config._provider = provider_mock
 
