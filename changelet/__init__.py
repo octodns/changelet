@@ -2,4 +2,4 @@
 #
 #
 
-__version__ = __VERSION__ = '0.4.0'
+__version__ = __VERSION__ = '0.5.0'
