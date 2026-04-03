@@ -74,6 +74,11 @@ class Bump:
             help='Skip checking for local changes when using --pr',
         )
         parser.add_argument(
+            '--check',
+            action='store_true',
+            help='Silently check if a bump would happen and exit with 0 or 1',
+        )
+        parser.add_argument(
             'title', nargs='*', help='A short title/quip for the release title'
         )
 
@@ -119,6 +124,8 @@ class Bump:
             if args.version
             else _get_new_version(current_version, entries)
         )
+        if args.check:
+            return self.exit(0 if new_version else 1)
         if not new_version:
             print('No changelog entries found that would bump, nothing to do')
             return self.exit(1)
