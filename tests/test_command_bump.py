@@ -34,12 +34,14 @@ class TestCommandBump(TestCase, AssertActionMixin):
             make_changes=False,
             pr=False,
             ignore_local_changes=False,
+            check=False,
         ):
             self.title = title
             self.make_changes = make_changes
             self.version = version
             self.pr = pr
             self.ignore_local_changes = ignore_local_changes
+            self.check = check
 
     def test_configure(self):
         create = Bump()
@@ -57,6 +59,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
             flags=['--ignore-local-changes'],
             default=False,
         )
+        self.assert_action(actions['check'], flags=['--check'], default=False)
         # 3.12 made a change to * so that required=False, before that it was
         # True, for now we'll have to ignore it
         required = False if version_info >= (3, 12, 0) else None
@@ -97,6 +100,43 @@ class TestCommandBump(TestCase, AssertActionMixin):
             Entry(type='none', description='change 2'),
         ]
         self.assertIsNone(cmd.run(args=self.MockArgs(title), config=config))
+
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_check_would_bump(self, gcv_mock, ela_mock, exit_mock):
+        cmd = Bump()
+
+        config = Config('.cl', provider=None)
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        ela_mock.return_value = [Entry(type='minor', description='change 1')]
+
+        exit_mock.return_value = None
+        cmd.run(args=self.MockArgs([], check=True), config=config)
+        exit_mock.assert_called_once_with(0)
+
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_check_nothing_to_bump(self, gcv_mock, ela_mock, exit_mock):
+        cmd = Bump()
+
+        config = Config('.cl', provider=None)
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+
+        # no entries
+        ela_mock.return_value = []
+        exit_mock.return_value = None
+        cmd.run(args=self.MockArgs([], check=True), config=config)
+        exit_mock.assert_called_once_with(1)
+
+        # only type none
+        exit_mock.reset_mock()
+        ela_mock.return_value = [Entry(type='none', description='change 1')]
+        cmd.run(args=self.MockArgs([], check=True), config=config)
+        exit_mock.assert_called_once_with(1)
 
     @patch('changelet.command.bump.Bump.exit')
     @patch('changelet.entry.Entry.load_all')
@@ -358,12 +398,14 @@ class TestCommandBumpPR(TestCase):
             make_changes=False,
             pr=False,
             ignore_local_changes=False,
+            check=False,
         ):
             self.title = title
             self.make_changes = make_changes
             self.version = version
             self.pr = pr
             self.ignore_local_changes = ignore_local_changes
+            self.check = check
 
     def _provider_mock(self, **overrides):
         provider = MagicMock()
