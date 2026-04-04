@@ -1,3 +1,8 @@
+## 0.6.0 - 2026-04-03
+
+Minor:
+* Add --check flag to bump command for silent exit-code-only validation - [#46](https://github.com/octodns/changelet/pull/46)
+
 ## 0.5.0 - 2026-03-14
 
 Minor:
