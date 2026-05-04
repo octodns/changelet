@@ -8,6 +8,7 @@ from importlib import import_module
 from io import StringIO
 from os import environ
 from os.path import join
+from shlex import split as shlex_split
 from subprocess import Popen
 from sys import exit, path, stderr
 
@@ -163,37 +164,6 @@ class Bump:
         buf.write('\n')
 
         buf = buf.getvalue()
-        if args.edit and (args.make_changes or args.pr) and not args.check:
-            changelog = join(root, 'CHANGELOG.md')
-            with open(changelog) as fh:
-                original_content = fh.read()
-
-            combined = buf + original_content
-
-            with open(changelog, 'w') as fh:
-                fh.write(combined)
-
-            original_hash = sha256(combined.encode()).hexdigest()
-
-            editor = (
-                environ.get('CHANGELET_EDITOR')
-                or environ.get('VISUAL')
-                or environ.get('EDITOR')
-                or 'nano'
-            )
-            Popen([editor, changelog]).wait()
-
-            with open(changelog) as fh:
-                edited_content = fh.read()
-
-            if sha256(edited_content.encode()).hexdigest() == original_hash:
-                with open(changelog, 'w') as fh:
-                    fh.write(original_content)
-                print('No changes made, aborting.')
-                return self.exit(1)
-
-            buf = edited_content
-
         if not args.make_changes and not args.pr:
             print(f'New version number {new_version}\n')
             print(buf)
@@ -211,6 +181,27 @@ class Bump:
             with open(changelog, 'w') as fh:
                 fh.write(buf)
                 fh.write(existing)
+
+            if args.edit:
+                combined = buf + existing
+                original_hash = sha256(combined.encode()).hexdigest()
+
+                editor_cmd = (
+                    environ.get('CHANGELET_EDITOR')
+                    or environ.get('VISUAL')
+                    or environ.get('EDITOR')
+                    or 'nano'
+                )
+                Popen(shlex_split(editor_cmd) + [changelog]).wait()
+
+                with open(changelog) as fh:
+                    buf = fh.read()
+
+                if sha256(buf.encode()).hexdigest() == original_hash:
+                    with open(changelog, 'w') as fh:
+                        fh.write(existing)
+                    print('No changes made, aborting.')
+                    return self.exit(1)
 
             init = join(root, module_name, '__init__.py')
             with open(init) as fh:
