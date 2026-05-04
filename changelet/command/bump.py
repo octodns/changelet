@@ -3,9 +3,12 @@
 #
 
 from datetime import datetime
+from hashlib import sha256
 from importlib import import_module
 from io import StringIO
+from os import environ
 from os.path import join
+from subprocess import Popen
 from sys import exit, path, stderr
 
 from semver import Version
@@ -67,6 +70,11 @@ class Bump:
             '--pr',
             action='store_true',
             help='Create a pull request with the version bump',
+        )
+        parser.add_argument(
+            '--edit',
+            action='store_true',
+            help='Open changelog in editor before committing changes',
         )
         parser.add_argument(
             '--ignore-local-changes',
@@ -155,6 +163,37 @@ class Bump:
         buf.write('\n')
 
         buf = buf.getvalue()
+        if args.edit and (args.make_changes or args.pr) and not args.check:
+            changelog = join(root, 'CHANGELOG.md')
+            with open(changelog) as fh:
+                original_content = fh.read()
+
+            combined = buf + original_content
+
+            with open(changelog, 'w') as fh:
+                fh.write(combined)
+
+            original_hash = sha256(combined.encode()).hexdigest()
+
+            editor = (
+                environ.get('CHANGELET_EDITOR')
+                or environ.get('VISUAL')
+                or environ.get('EDITOR')
+                or 'nano'
+            )
+            Popen([editor, changelog]).wait()
+
+            with open(changelog) as fh:
+                edited_content = fh.read()
+
+            if sha256(edited_content.encode()).hexdigest() == original_hash:
+                with open(changelog, 'w') as fh:
+                    fh.write(original_content)
+                print('No changes made, aborting.')
+                return self.exit(1)
+
+            buf = edited_content
+
         if not args.make_changes and not args.pr:
             print(f'New version number {new_version}\n')
             print(buf)
