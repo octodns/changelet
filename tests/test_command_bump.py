@@ -33,6 +33,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
             version=None,
             make_changes=False,
             pr=False,
+            edit=False,
             ignore_local_changes=False,
             check=False,
         ):
@@ -40,6 +41,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
             self.make_changes = make_changes
             self.version = version
             self.pr = pr
+            self.edit = edit
             self.ignore_local_changes = ignore_local_changes
             self.check = check
 
@@ -54,6 +56,7 @@ class TestCommandBump(TestCase, AssertActionMixin):
             actions['make_changes'], flags=['--make-changes'], default=False
         )
         self.assert_action(actions['pr'], flags=['--pr'], default=False)
+        self.assert_action(actions['edit'], flags=['--edit'], default=False)
         self.assert_action(
             actions['ignore_local_changes'],
             flags=['--ignore-local-changes'],
@@ -281,6 +284,318 @@ Patch:
             with open(init) as fh:
                 self.assertEqual("# __version__ = '3.0.0' #", fh.read())
 
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.environ')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_no_changes_aborts(
+        self, gcv_mock, ela_mock, exit_mock, environ_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        ela_mock.return_value = [Entry(type='minor', description='change 1')]
+
+        environ_mock.get.side_effect = (
+            lambda key, default=None: default or 'nano'
+        )
+
+        mock_proc = MagicMock()
+        mock_proc.wait.return_value = None
+        popen_mock.return_value = mock_proc
+
+        with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            with open(changelog, 'w') as fh:
+                fh.write('existing content\n')
+
+            init = join(td.dirname, module_name)
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
+
+            exit_mock.return_value = None
+            cmd.run(
+                self.MockArgs([], edit=True, make_changes=True),
+                config=config,
+                root=td.dirname,
+            )
+
+            popen_mock.assert_called_once()
+            with open(changelog) as fh:
+                self.assertEqual('existing content\n', fh.read())
+            exit_mock.assert_called_once_with(1)
+
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.environ')
+    @patch('changelet.entry.remove')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_with_changes_proceeds(
+        self, gcv_mock, ela_mock, exit_mock, rm_mock, environ_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        now = datetime.now().replace(tzinfo=timezone.utc)
+        ela_mock.return_value = [
+            Entry(
+                type='minor',
+                description='change 1',
+                pr=Pr(
+                    id=1,
+                    text='text 1',
+                    url='http://1',
+                    merged_at=now - timedelta(days=1),
+                ),
+            )
+        ]
+
+        environ_mock.get.side_effect = (
+            lambda key, default=None: default or 'nano'
+        )
+
+        class EditingProcess:
+            def __init__(self, args):
+                self.path = args[1]
+
+            def wait(self):
+                with open(self.path) as fh:
+                    content = fh.read()
+                with open(self.path, 'w') as fh:
+                    fh.write(content.replace('change 1', 'change 1 - edited'))
+
+        popen_mock.side_effect = EditingProcess
+
+        with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            existing = 'existing content\n'
+            with open(changelog, 'w') as fh:
+                fh.write(existing)
+
+            init = join(td.dirname, module_name)
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
+
+            for i, entry in enumerate(ela_mock.return_value):
+                entry.filename = join(config.directory, f'ela-{i:04d}.md')
+
+            exit_mock.return_value = None
+            cmd.run(
+                self.MockArgs([], edit=True, make_changes=True),
+                config=config,
+                root=td.dirname,
+            )
+
+            popen_mock.assert_called_once()
+            with open(changelog) as fh:
+                content = fh.read()
+                self.assertIn('existing content\n', content)
+            rm_mock.assert_has_calls(
+                [call(e.filename) for e in ela_mock.return_value],
+                any_order=True,
+            )
+
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_without_make_changes_or_pr(
+        self, gcv_mock, ela_mock, exit_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        ela_mock.return_value = [Entry(type='minor', description='change 1')]
+
+        exit_mock.return_value = None
+        cmd.run(self.MockArgs([], edit=True), config=MagicMock())
+
+        popen_mock.assert_not_called()
+        exit_mock.assert_called_once_with(0)
+
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_with_check_skips_edit(
+        self, gcv_mock, ela_mock, exit_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        ela_mock.return_value = [Entry(type='minor', description='change 1')]
+
+        exit_mock.return_value = None
+        cmd.run(self.MockArgs([], edit=True, check=True), config=MagicMock())
+
+        popen_mock.assert_not_called()
+        exit_mock.assert_called_once_with(0)
+
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.environ')
+    @patch('changelet.entry.remove')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_with_editor_args(
+        self, gcv_mock, ela_mock, exit_mock, rm_mock, environ_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        now = datetime.now().replace(tzinfo=timezone.utc)
+        ela_mock.return_value = [
+            Entry(
+                type='minor',
+                description='change 1',
+                pr=Pr(
+                    id=1,
+                    text='text 1',
+                    url='http://1',
+                    merged_at=now - timedelta(days=1),
+                ),
+            )
+        ]
+
+        environ_mock.get.side_effect = lambda key, default=None: {
+            'CHANGELET_EDITOR': 'vim -f'
+        }.get(key, default)
+
+        class EditingProcess:
+            def __init__(self, args):
+                self.path = args[-1]
+
+            def wait(self):
+                with open(self.path) as fh:
+                    content = fh.read()
+                with open(self.path, 'w') as fh:
+                    fh.write(content.replace('change 1', 'change 1 - edited'))
+
+        popen_mock.side_effect = EditingProcess
+
+        with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            existing = 'existing content\n'
+            with open(changelog, 'w') as fh:
+                fh.write(existing)
+
+            init = join(td.dirname, module_name)
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
+
+            for i, entry in enumerate(ela_mock.return_value):
+                entry.filename = join(config.directory, f'ela-{i:04d}.md')
+
+            exit_mock.return_value = None
+            cmd.run(
+                self.MockArgs([], edit=True, make_changes=True),
+                config=config,
+                root=td.dirname,
+            )
+
+            popen_mock.assert_called_once_with(['vim', '-f', changelog])
+
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.environ')
+    @patch('changelet.entry.remove')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_with_quoted_editor_args(
+        self, gcv_mock, ela_mock, exit_mock, rm_mock, environ_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        now = datetime.now().replace(tzinfo=timezone.utc)
+        ela_mock.return_value = [
+            Entry(
+                type='minor',
+                description='change 1',
+                pr=Pr(
+                    id=1,
+                    text='text 1',
+                    url='http://1',
+                    merged_at=now - timedelta(days=1),
+                ),
+            )
+        ]
+
+        environ_mock.get.side_effect = lambda key, default=None: {
+            'CHANGELET_EDITOR': '"code --wait" --new-window'
+        }.get(key, default)
+
+        class EditingProcess:
+            def __init__(self, args):
+                self.path = args[-1]
+
+            def wait(self):
+                with open(self.path) as fh:
+                    content = fh.read()
+                with open(self.path, 'w') as fh:
+                    fh.write(content.replace('change 1', 'change 1 - edited'))
+
+        popen_mock.side_effect = EditingProcess
+
+        with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            existing = 'existing content\n'
+            with open(changelog, 'w') as fh:
+                fh.write(existing)
+
+            init = join(td.dirname, module_name)
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
+
+            for i, entry in enumerate(ela_mock.return_value):
+                entry.filename = join(config.directory, f'ela-{i:04d}.md')
+
+            exit_mock.return_value = None
+            cmd.run(
+                self.MockArgs([], edit=True, make_changes=True),
+                config=config,
+                root=td.dirname,
+            )
+
+            # shlex.split preserves quotes as single argument boundaries
+            popen_mock.assert_called_once_with(
+                ['code --wait', '--new-window', changelog]
+            )
+
 
 class TestGetNewVersion(TestCase):
 
@@ -397,6 +712,7 @@ class TestCommandBumpPR(TestCase):
             version=None,
             make_changes=False,
             pr=False,
+            edit=False,
             ignore_local_changes=False,
             check=False,
         ):
@@ -404,6 +720,7 @@ class TestCommandBumpPR(TestCase):
             self.make_changes = make_changes
             self.version = version
             self.pr = pr
+            self.edit = edit
             self.ignore_local_changes = ignore_local_changes
             self.check = check
 

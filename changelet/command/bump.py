@@ -3,9 +3,13 @@
 #
 
 from datetime import datetime
+from hashlib import sha256
 from importlib import import_module
 from io import StringIO
+from os import environ
 from os.path import join
+from shlex import split as shlex_split
+from subprocess import Popen
 from sys import exit, path, stderr
 
 from semver import Version
@@ -67,6 +71,11 @@ class Bump:
             '--pr',
             action='store_true',
             help='Create a pull request with the version bump',
+        )
+        parser.add_argument(
+            '--edit',
+            action='store_true',
+            help='Open changelog in editor before committing changes',
         )
         parser.add_argument(
             '--ignore-local-changes',
@@ -172,6 +181,27 @@ class Bump:
             with open(changelog, 'w') as fh:
                 fh.write(buf)
                 fh.write(existing)
+
+            if args.edit:
+                combined = buf + existing
+                original_hash = sha256(combined.encode()).hexdigest()
+
+                editor_cmd = (
+                    environ.get('CHANGELET_EDITOR')
+                    or environ.get('VISUAL')
+                    or environ.get('EDITOR')
+                    or 'nano'
+                )
+                Popen(shlex_split(editor_cmd) + [changelog]).wait()
+
+                with open(changelog) as fh:
+                    buf = fh.read()
+
+                if sha256(buf.encode()).hexdigest() == original_hash:
+                    with open(changelog, 'w') as fh:
+                        fh.write(existing)
+                    print('No changes made, aborting.')
+                    return self.exit(1)
 
             init = join(root, module_name, '__init__.py')
             with open(init) as fh:
