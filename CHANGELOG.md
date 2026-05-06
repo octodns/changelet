@@ -1,3 +1,8 @@
+## 0.6.1 - 2026-05-06
+
+Patch:
+* Add --edit flag to bump command - [#49](https://github.com/octodns/changelet/pull/49)
+
 ## 0.6.0 - 2026-04-03
 
 Minor:
