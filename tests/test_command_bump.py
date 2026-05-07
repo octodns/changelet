@@ -8,7 +8,7 @@ from os import makedirs
 from os.path import basename, join
 from sys import path, version_info
 from unittest import TestCase
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 from helpers import AssertActionMixin, TemporaryDirectory
 from semver import Version
@@ -302,7 +302,7 @@ Patch:
         )
 
         mock_proc = MagicMock()
-        mock_proc.wait.return_value = None
+        mock_proc.wait.return_value = 0
         popen_mock.return_value = mock_proc
 
         with TemporaryDirectory() as td:
@@ -330,6 +330,102 @@ Patch:
             )
 
             popen_mock.assert_called_once()
+            with open(changelog) as fh:
+                self.assertEqual('existing content\n', fh.read())
+            exit_mock.assert_called_once_with(1)
+
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.environ')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_editor_not_found_aborts(
+        self, gcv_mock, ela_mock, exit_mock, environ_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        ela_mock.return_value = [Entry(type='minor', description='change 1')]
+
+        environ_mock.get.side_effect = (
+            lambda key, default=None: default or 'nano'
+        )
+
+        popen_mock.side_effect = FileNotFoundError('nano not found')
+
+        with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            with open(changelog, 'w') as fh:
+                fh.write('existing content\n')
+
+            init = join(td.dirname, module_name)
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
+
+            exit_mock.return_value = None
+            cmd.run(
+                self.MockArgs([], edit=True, make_changes=True),
+                config=config,
+                root=td.dirname,
+            )
+
+            with open(changelog) as fh:
+                self.assertEqual('existing content\n', fh.read())
+            exit_mock.assert_called_once_with(1)
+
+    @patch('changelet.command.bump.Popen')
+    @patch('changelet.command.bump.environ')
+    @patch('changelet.command.bump.Bump.exit')
+    @patch('changelet.entry.Entry.load_all')
+    @patch('changelet.command.bump._get_current_version')
+    def test_edit_editor_nonzero_exit_aborts(
+        self, gcv_mock, ela_mock, exit_mock, environ_mock, popen_mock
+    ):
+        cmd = Bump()
+
+        gcv_mock.return_value = Version.parse('0.1.3')
+        ela_mock.return_value = [Entry(type='minor', description='change 1')]
+
+        environ_mock.get.side_effect = (
+            lambda key, default=None: default or 'nano'
+        )
+
+        mock_proc = MagicMock()
+        mock_proc.wait.return_value = 1
+        popen_mock.return_value = mock_proc
+
+        with TemporaryDirectory() as td:
+            module_name = basename(td.dirname).replace('-', '_')
+
+            changelog = join(td.dirname, 'CHANGELOG.md')
+            with open(changelog, 'w') as fh:
+                fh.write('existing content\n')
+
+            init = join(td.dirname, module_name)
+            makedirs(init)
+            init = join(init, '__init__.py')
+            with open(init, 'w') as fh:
+                fh.write("# __version__ = '0.1.3' #")
+
+            config = Config(
+                join(td.dirname, '.cl'), module=module_name, provider=None
+            )
+
+            exit_mock.return_value = None
+            cmd.run(
+                self.MockArgs([], edit=True, make_changes=True),
+                config=config,
+                root=td.dirname,
+            )
+
             with open(changelog) as fh:
                 self.assertEqual('existing content\n', fh.read())
             exit_mock.assert_called_once_with(1)
@@ -373,6 +469,7 @@ Patch:
                     content = fh.read()
                 with open(self.path, 'w') as fh:
                     fh.write(content.replace('change 1', 'change 1 - edited'))
+                return 0
 
         popen_mock.side_effect = EditingProcess
 
@@ -488,6 +585,7 @@ Patch:
                     content = fh.read()
                 with open(self.path, 'w') as fh:
                     fh.write(content.replace('change 1', 'change 1 - edited'))
+                return 0
 
         popen_mock.side_effect = EditingProcess
 
@@ -519,7 +617,7 @@ Patch:
                 root=td.dirname,
             )
 
-            popen_mock.assert_called_once_with(['vim', '-f', changelog])
+            popen_mock.assert_called_once_with(['vim', '-f', ANY])
 
     @patch('changelet.command.bump.Popen')
     @patch('changelet.command.bump.environ')
@@ -560,6 +658,7 @@ Patch:
                     content = fh.read()
                 with open(self.path, 'w') as fh:
                     fh.write(content.replace('change 1', 'change 1 - edited'))
+                return 0
 
         popen_mock.side_effect = EditingProcess
 
@@ -593,7 +692,7 @@ Patch:
 
             # shlex.split preserves quotes as single argument boundaries
             popen_mock.assert_called_once_with(
-                ['code --wait', '--new-window', changelog]
+                ['code --wait', '--new-window', ANY]
             )
 
 

@@ -6,11 +6,12 @@ from datetime import datetime
 from hashlib import sha256
 from importlib import import_module
 from io import StringIO
-from os import environ
+from os import environ, fdopen, unlink
 from os.path import join
 from shlex import split as shlex_split
 from subprocess import Popen
 from sys import exit, path, stderr
+from tempfile import mkstemp
 
 from semver import Version
 
@@ -178,13 +179,8 @@ class Bump:
             with open(changelog) as fh:
                 existing = fh.read()
 
-            with open(changelog, 'w') as fh:
-                fh.write(buf)
-                fh.write(existing)
-
             if args.edit:
-                combined = buf + existing
-                original_hash = sha256(combined.encode()).hexdigest()
+                original_hash = sha256(buf.encode()).hexdigest()
 
                 editor_cmd = (
                     environ.get('CHANGELET_EDITOR')
@@ -192,16 +188,33 @@ class Bump:
                     or environ.get('EDITOR')
                     or 'nano'
                 )
-                Popen(shlex_split(editor_cmd) + [changelog]).wait()
-
-                with open(changelog) as fh:
-                    buf = fh.read()
+                fd, tmp_path = mkstemp(suffix='.md')
+                try:
+                    with fdopen(fd, 'w') as fh:
+                        fh.write(buf)
+                    try:
+                        rc = Popen(shlex_split(editor_cmd) + [tmp_path]).wait()
+                    except OSError as e:
+                        print(f'Failed to open editor: {e}', file=stderr)
+                        return self.exit(1)
+                    if rc != 0:
+                        print(
+                            f'Editor exited with non-zero status {rc}, aborting.',
+                            file=stderr,
+                        )
+                        return self.exit(1)
+                    with open(tmp_path) as fh:
+                        buf = fh.read()
+                finally:
+                    unlink(tmp_path)
 
                 if sha256(buf.encode()).hexdigest() == original_hash:
-                    with open(changelog, 'w') as fh:
-                        fh.write(existing)
                     print('No changes made, aborting.')
                     return self.exit(1)
+
+            with open(changelog, 'w') as fh:
+                fh.write(buf)
+                fh.write(existing)
 
             init = join(root, module_name, '__init__.py')
             with open(init) as fh:
